@@ -7,6 +7,7 @@ import '../../words/presentation/library_screen.dart';
 import '../../exercises/presentation/exercise_screen.dart';
 import '../../discovery/presentation/discovery_screen.dart';
 import '../../export/presentation/export_words_screen.dart';
+import '../../import/presentation/import_words_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -295,6 +296,13 @@ class _HomeScreenState extends State<HomeScreen> {
               Icons.menu_book_rounded,
               const Color(0xFFEEF0FF),
               () => _open(const LibraryScreen()),
+            ),
+            _action(
+              'الاستيراد',
+              'أدخل ملف JSON إلى الاكتشاف أو المراجعة مباشرة',
+              Icons.file_upload_rounded,
+              const Color(0xFFFFF3E8),
+              () => _open(const ImportWordsScreen()),
             ),
             _action(
               'التصدير',
