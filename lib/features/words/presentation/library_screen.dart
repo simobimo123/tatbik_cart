@@ -82,7 +82,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     itemCount: _data.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 9),
+                    separatorBuilder: (_, _) => const SizedBox(height: 9),
                     itemBuilder: (context, index) {
                       final word = _data[index];
 
