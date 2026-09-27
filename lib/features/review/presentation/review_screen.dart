@@ -95,19 +95,20 @@ class _ReviewScreenState extends State<ReviewScreen>
 
       if (_queue.isNotEmpty) {
         if (remembered && hasBeenAnsweredBefore) {
-          // إذا تذكّرها مرة ثانية: تنتقل إلى آخر الحزمة.
+          // عندما تظهر البطاقة مرة ثانية ويعرفها المستخدم:
+          // ننقلها إلى نهاية الحزمة، فلا تعود للمنافسة مع البطاقات
+          // التي لم تثبت بعد.
           _queue.add(word);
         } else {
-          // أول "تذكّرتها" = البطاقة العاشرة.
-          // أول "لم أتذكر" = البطاقة الثلاثون.
+          // المنطق المطلوب:
+          // - "لم أتذكر" أول مرة  -> بعد 10 بطاقات أخرى.
+          // - "تذكرت" أول مرة     -> بعد 30 بطاقة أخرى.
           //
-          // بعد حذف البطاقة الحالية، الفهرس 0 هو البطاقة التالية.
-          // لذلك نستخدم targetPosition - 1 حتى تكون البطاقة فعلاً
-          // رقم 10 أو 30، وليس 11 أو 31.
-          final targetPosition = remembered ? 10 : 30;
-          final insertAt = (targetPosition - 1)
-              .clamp(0, _queue.length)
-              .toInt();
+          // بعد حذف البطاقة الحالية، أول بطاقة في _queue هي البطاقة
+          // التالية التي سيشاهدها المستخدم. لذلك insertAt = delay
+          // يعني أن المستخدم سيرى بالضبط delay بطاقات قبل عودة هذه البطاقة.
+          final delay = remembered ? 30 : 10;
+          final insertAt = delay.clamp(0, _queue.length).toInt();
 
           _queue.insert(insertAt, word);
         }
