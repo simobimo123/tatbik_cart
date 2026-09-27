@@ -117,12 +117,12 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
       if (!mounted) return;
       setState(_refresh);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم إنشاء التصنيف «' + name.trim() + '»')),
+        SnackBar(content: Text('تم إنشاء التصنيف «${name.trim()}»')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر إنشاء التصنيف: ' + e.toString())),
+        SnackBar(content: Text('تعذر إنشاء التصنيف: $e')),
       );
     }
   }
@@ -160,7 +160,7 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'تعذر تحميل أقسام المراجعة:\n' + snapshot.error.toString(),
+                  'تعذر تحميل أقسام المراجعة:\n${snapshot.error}',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -268,7 +268,7 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  total.toString() + ' كلمة في نظام المراجعة',
+                  '$total كلمة في نظام المراجعة',
                   style: const TextStyle(color: Color(0xFFEDEEFF), fontSize: 13),
                 ),
               ],
