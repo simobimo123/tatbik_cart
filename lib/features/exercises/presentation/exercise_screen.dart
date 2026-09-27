@@ -20,8 +20,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
   Future<void> _start() async {
     _words = await _repository.getWords();
-    if (_words.length >= 4) _next();
-    else if (mounted) setState(() {});
+    if (_words.length >= 4) {
+      _next();
+    } else if (mounted) {
+      setState(() {});
+    }
   }
 
   void _next() {
@@ -41,7 +44,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     if (_selected != null) return;
     setState(() {
       _selected = option;
-      if (option == _question!.translation) _score++;
+      if (option == _question!.translation) {
+        _score++;
+      }
     });
   }
 
