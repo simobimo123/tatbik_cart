@@ -208,7 +208,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'تم اكتشاف $_step كلمة / قرار حتى الآن',
+                        'الكلمات المعروفة تُحفظ في نهاية طابور الاكتشاف.',
                         style: const TextStyle(
                           color: Colors.black54,
                           fontSize: 13,
@@ -451,7 +451,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
             ),
             const SizedBox(height: 11),
             const Text(
-              '«أعرفها» تؤجل الكلمة 1000 بطاقة. «لا أعرفها» تنقلها مباشرة إلى المراجعة.',
+              '«أعرفها» تنقل الكلمة إلى آخر طابور الاكتشاف. «لا أعرفها» تنقلها مباشرة إلى المراجعة.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.black45,
