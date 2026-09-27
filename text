@@ -1,0 +1,14 @@
+  تحديت الحاسوب
+
+git fetch origin
+git reset --hard origin/main
+git clean -fd
+flutter analyze 
+
+تحديت جيت هوب
+
+
+
+git add .
+git commit -m "Update app"
+git push origin main
