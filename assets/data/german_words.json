@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "words": [
+    {
+      "german": "ich",
+      "translation": "أنا",
+      "example": "Ich lerne Deutsch."
+    },
+    {
+      "german": "du",
+      "translation": "أنت",
+      "example": "Du lernst Deutsch."
+    }
+  ]
+}
