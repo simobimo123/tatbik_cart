@@ -105,7 +105,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
     switch (types[_random.nextInt(types.length)]) {
       case _QuestionType.translation:
-        return _question(
+        return _buildQuestion(
           _QuestionType.translation,
           word,
           'ما الترجمة الصحيحة للكلمة؟',
@@ -114,7 +114,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           words.map((w) => w.translation),
         );
       case _QuestionType.germanWord:
-        return _question(
+        return _buildQuestion(
           _QuestionType.germanWord,
           word,
           'أي كلمة ألمانية تطابق المعنى؟',
@@ -123,7 +123,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           words.map((w) => w.german),
         );
       case _QuestionType.sentenceTranslation:
-        return _question(
+        return _buildQuestion(
           _QuestionType.sentenceTranslation,
           word,
           'ما الترجمة الصحيحة لهذه الجملة؟',
@@ -132,7 +132,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           words.map((w) => w.exampleTranslation),
         );
       case _QuestionType.sentenceGerman:
-        return _question(
+        return _buildQuestion(
           _QuestionType.sentenceGerman,
           word,
           'أي جملة ألمانية تطابق هذه الترجمة؟',
@@ -143,7 +143,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       case _QuestionType.completeSentence:
         final masked = _mask(word.example, word.german);
         if (masked == word.example) {
-          return _question(
+          return _buildQuestion(
             _QuestionType.translation,
             word,
             'ما الترجمة الصحيحة للكلمة؟',
@@ -152,7 +152,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             words.map((w) => w.translation),
           );
         }
-        return _question(
+        return _buildQuestion(
           _QuestionType.completeSentence,
           word,
           'أكمل الجملة بالكلمة المناسبة',
@@ -161,7 +161,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           words.map((w) => w.german),
         );
       case _QuestionType.findSentence:
-        return _question(
+        return _buildQuestion(
           _QuestionType.findSentence,
           word,
           'اختر الجملة التي تحتوي على الكلمة المطلوبة',
@@ -172,7 +172,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     }
   }
 
-  _Question _question(
+  _Question _buildQuestion(
     _QuestionType type,
     WordModel word,
     String prompt,
