@@ -4,6 +4,7 @@ import '../../data/datasources/word_catalog.dart';
 
 class DatabaseHelper {
   DatabaseHelper._();
+
   static final instance = DatabaseHelper._();
 
   Database? _database;
@@ -12,12 +13,11 @@ class DatabaseHelper {
     if (_database != null) return _database!;
 
     final directory = await getDatabasesPath();
+
     _database = await openDatabase(
       path.join(directory, 'deutsch_lernen.db'),
-      version: 2,
-      onCreate: (db, version) async {
-        await _createTables(db);
-      },
+      version: 3,
+      onCreate: (db, version) => _createTables(db),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute(
@@ -31,14 +31,35 @@ class DatabaseHelper {
             'CREATE INDEX word_discoveries_known ON word_discoveries(known)',
           );
 
-          // نحافظ على الكلمات اليدوية التي كانت تدخل المراجعة
-          // تلقائيًا في الإصدار السابق.
           final now = DateTime.now().toIso8601String();
           await db.execute(
             'INSERT OR IGNORE INTO reviews '
             '(word_id, interval_days, ease, repetitions, due_at) '
             'SELECT id, 0, 2.5, 0, ? FROM words WHERE builtin = 0',
             [now],
+          );
+        }
+
+        if (oldVersion < 3) {
+          await db.execute(
+            "ALTER TABLE words ADD COLUMN example_translation TEXT NOT NULL DEFAULT ''",
+          );
+          await db.execute(
+            "ALTER TABLE word_discoveries ADD COLUMN due_step INTEGER NOT NULL DEFAULT 0",
+          );
+          await db.execute(
+            "ALTER TABLE word_discoveries ADD COLUMN times_seen INTEGER NOT NULL DEFAULT 0",
+          );
+          await db.execute(
+            'CREATE TABLE app_state ('
+            'key TEXT PRIMARY KEY, '
+            'value INTEGER NOT NULL'
+            ')',
+          );
+          await db.insert(
+            'app_state',
+            {'key': 'discovery_step', 'value': 0},
+            conflictAlgorithm: ConflictAlgorithm.ignore,
           );
         }
       },
@@ -55,10 +76,12 @@ class DatabaseHelper {
       'german TEXT NOT NULL, '
       'translation TEXT NOT NULL, '
       'example TEXT NOT NULL, '
+      'example_translation TEXT NOT NULL DEFAULT "", '
       'builtin INTEGER NOT NULL DEFAULT 0, '
       'created_at TEXT NOT NULL'
       ')',
     );
+
     await db.execute(
       'CREATE TABLE reviews ('
       'word_id INTEGER PRIMARY KEY, '
@@ -68,16 +91,33 @@ class DatabaseHelper {
       'due_at TEXT'
       ')',
     );
+
     await db.execute(
       'CREATE TABLE word_discoveries ('
       'word_id INTEGER PRIMARY KEY, '
       'known INTEGER NOT NULL, '
-      'discovered_at TEXT NOT NULL'
+      'discovered_at TEXT NOT NULL, '
+      'due_step INTEGER NOT NULL DEFAULT 0, '
+      'times_seen INTEGER NOT NULL DEFAULT 0'
       ')',
     );
+
+    await db.execute(
+      'CREATE TABLE app_state ('
+      'key TEXT PRIMARY KEY, '
+      'value INTEGER NOT NULL'
+      ')',
+    );
+
+    await db.insert(
+      'app_state',
+      {'key': 'discovery_step', 'value': 0},
+    );
+
     await db.execute('CREATE INDEX words_german ON words(german)');
     await db.execute(
-      'CREATE INDEX word_discoveries_known ON word_discoveries(known)',
+      'CREATE INDEX word_discoveries_due '
+      'ON word_discoveries(known, due_step)',
     );
   }
 
@@ -85,25 +125,36 @@ class DatabaseHelper {
     final catalog = await WordCatalog.load();
     if (catalog.isEmpty) return;
 
-    final batch = db.batch();
+    await db.transaction((txn) async {
+      for (final item in catalog) {
+        final existing = await txn.query(
+          'words',
+          columns: ['id'],
+          where: 'german=? AND builtin=1',
+          whereArgs: [item.german],
+          limit: 1,
+        );
 
-    for (final word in catalog) {
-      batch.rawInsert(
-        'INSERT INTO words (german, translation, example, builtin, created_at) '
-        'SELECT ?, ?, ?, 1, ? '
-        'WHERE NOT EXISTS ('
-        'SELECT 1 FROM words WHERE german = ? AND builtin = 1'
-        ')',
-        [
-          word.german,
-          word.translation,
-          word.example,
-          DateTime.now().toIso8601String(),
-          word.german,
-        ],
-      );
-    }
+        final values = {
+          'german': item.german,
+          'translation': item.translation,
+          'example': item.example,
+          'example_translation': item.exampleTranslation,
+          'builtin': 1,
+          'created_at': DateTime.now().toIso8601String(),
+        };
 
-    await batch.commit(noResult: true);
+        if (existing.isEmpty) {
+          await txn.insert('words', values);
+        } else {
+          await txn.update(
+            'words',
+            values,
+            where: 'id=?',
+            whereArgs: [existing.first['id']],
+          );
+        }
+      }
+    });
   }
 }
