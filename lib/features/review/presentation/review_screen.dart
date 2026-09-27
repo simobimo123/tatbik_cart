@@ -18,6 +18,10 @@ class _ReviewScreenState extends State<ReviewScreen>
   List<WordModel> _queue = [];
   int _index = 0;
   bool _revealed = false;
+
+  // Number of times each word has been answered during this review session.
+  // This controls where the card is placed back into the current queue.
+  final Map<int, int> _sessionAnswerCount = {};
   bool _isAnimating = false;
 
   late final AnimationController _exitController;
@@ -76,18 +80,36 @@ class _ReviewScreenState extends State<ReviewScreen>
     if (!mounted) return;
 
     setState(() {
-      // Remove the reviewed card from the active queue.
-      // The next card automatically becomes the current card at the same index.
+      final answerCount = _sessionAnswerCount[word.id] ?? 0;
+      final hasBeenAnsweredBefore = answerCount > 0;
+
+      _sessionAnswerCount[word.id] = answerCount + 1;
+
+      // Remove the current card first. The next card then takes its place.
       _queue.removeAt(_index);
 
-      if (_index >= _queue.length && _queue.isNotEmpty) {
-        _index = _queue.length - 1;
+      if (_queue.isNotEmpty) {
+        if (remembered && hasBeenAnsweredBefore) {
+          // The second (or later) successful recall sends the word
+          // to the end of this review session.
+          _queue.add(word);
+        } else {
+          // First successful recall: show it again after 10 cards.
+          // Failed recall: show it again after 30 cards.
+          final delay = remembered ? 10 : 30;
+          final insertAt = (_index + delay).clamp(0, _queue.length).toInt();
+          _queue.insert(insertAt, word);
+        }
       }
 
       _revealed = false;
       _dragOffset = Offset.zero;
       _isAnimating = false;
       _exitAnimation = null;
+
+      if (_index >= _queue.length && _queue.isNotEmpty) {
+        _index = _queue.length - 1;
+      }
     });
   }
 
