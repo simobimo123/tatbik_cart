@@ -8,7 +8,14 @@ import 'add_review_word_screen.dart';
 import '../../export/presentation/export_words_screen.dart';
 
 class ReviewScreen extends StatefulWidget {
-  const ReviewScreen({super.key});
+  const ReviewScreen({
+    super.key,
+    this.categoryId,
+    this.difficulty,
+  });
+
+  final int? categoryId;
+  final String? difficulty;
 
   @override
   State<ReviewScreen> createState() => _ReviewScreenState();
@@ -68,7 +75,11 @@ class _ReviewScreenState extends State<ReviewScreen>
       setState(() => _loading = true);
     }
 
-    final queue = await _words.dueWords(limit: 300);
+    final queue = await _words.dueWords(
+      limit: 300,
+      categoryId: widget.categoryId,
+      difficulty: widget.difficulty,
+    );
 
     if (!mounted) return;
 
@@ -154,7 +165,11 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
   Future<void> _appendMoreDueWords() async {
-    final more = await _words.dueWords(limit: 300);
+    final more = await _words.dueWords(
+      limit: 300,
+      categoryId: widget.categoryId,
+      difficulty: widget.difficulty,
+    );
     if (!mounted || more.isEmpty) return;
 
     setState(() {
@@ -945,7 +960,9 @@ class _ReviewScreenState extends State<ReviewScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'المراجعة',
+              widget.categoryId != null || widget.difficulty != null
+                  ? 'المراجعة المفلترة'
+                  : 'المراجعة',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
             Text(
