@@ -31,7 +31,7 @@ class _ExportWordsScreenState extends State<ExportWordsScreen> {
           .first;
       final kind = reviewOnly ? 'review' : 'all';
       final file = File(
-        '${directory.path}/deutsch_lernen_${kind}_${stamp}.json',
+        '${directory.path}/deutsch_lernen_$kind_$stamp.json',
       );
 
       await file.writeAsString(json);
