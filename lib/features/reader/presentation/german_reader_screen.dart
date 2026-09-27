@@ -81,7 +81,7 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
 
   List<String> _splitSentences(String text) {
     final normalized = text
-        .replaceAll(RegExp(r'\\s+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
     if (normalized.isEmpty) return [];
@@ -299,9 +299,9 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
               alignLabelWithHint: true,
             ),
             onChanged: (_) {
-              if (_sentences.isNotEmpty) {
-                setState(() => _sentences = []);
-              }
+              setState(() {
+                _sentences = [];
+              });
             },
           ),
           const SizedBox(height: 11),
