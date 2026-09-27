@@ -1,5 +1,4 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import '../../../data/models/word_model.dart';
 import '../../../data/repositories/review_repository.dart';
@@ -21,8 +20,6 @@ class _ReviewScreenState extends State<ReviewScreen>
   int _index = 0;
   bool _revealed = false;
 
-  // Number of times each word has been answered during this review session.
-  // This controls where the card is placed back into the current queue.
   final Map<int, int> _sessionAnswerCount = {};
   final Map<int, bool> _germanFront = {};
   final Random _random = Random();
@@ -43,9 +40,8 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     _exitController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 360),
+      duration: const Duration(milliseconds: 300),
     );
-
     _load();
   }
 
@@ -63,7 +59,6 @@ class _ReviewScreenState extends State<ReviewScreen>
     final queue = await _words.dueWords();
 
     if (!mounted) return;
-
     setState(() {
       _queue = queue;
       _index = 0;
@@ -78,22 +73,16 @@ class _ReviewScreenState extends State<ReviewScreen>
     }
 
     final word = _queue[_index];
-    final direction =
-        remembered ? const Offset(1.25, 0.02) : const Offset(-1.25, 0.02);
+    
+    // تم الإصلاح: استخدام مسافة بالبيكسلات بدلاً من النسب العشرية لخروج البطاقة
+    final direction = remembered ? const Offset(500, 40) : const Offset(-500, 40);
 
-    // Mark the card as busy immediately so a second gesture cannot start
-    // another animation while this one is finishing.
     setState(() => _isAnimating = true);
 
-    // Start saving immediately, but do not make the visual transition wait
-    // for SQLite. The card should always leave the screen smoothly.
     final saveFuture = _reviews.review(word.id, remembered);
 
     await _animateCardExit(direction);
 
-    // Move the card in the queue immediately after the exit animation.
-    // The card behind it therefore becomes the new current card without
-    // ever rendering the old card as the next card.
     if (!mounted) return;
 
     setState(() {
@@ -106,11 +95,8 @@ class _ReviewScreenState extends State<ReviewScreen>
 
       if (_queue.isNotEmpty) {
         if (remembered && hasBeenAnsweredBefore) {
-          // A word remembered again goes to the end of this session.
           _queue.add(word);
         } else {
-          // First "remembered": after 10 other cards.
-          // "Not remembered": after 30 other cards.
           final delay = remembered ? 10 : 30;
           final insertAt = (_index + delay).clamp(0, _queue.length).toInt();
           _queue.insert(insertAt, word);
@@ -127,8 +113,6 @@ class _ReviewScreenState extends State<ReviewScreen>
       }
     });
 
-    // Complete persistence after the UI has already moved on.
-    // Any database error is kept separate from the card animation.
     await saveFuture;
   }
 
@@ -139,11 +123,11 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     final word = _queue[_index];
 
-    await _animateCardExit(const Offset(0, 1.25));
+    // تم الإصلاح: مسافة خروج سفلية واضحة بالبيكسلات
+    await _animateCardExit(const Offset(0, 500));
     await _words.remove(word.id);
 
     if (!mounted) return;
-
     setState(() {
       _queue.removeAt(_index);
       _revealed = false;
@@ -161,7 +145,6 @@ class _ReviewScreenState extends State<ReviewScreen>
     if (!mounted) return;
 
     final start = _dragOffset;
-
     setState(() {
       _exitAnimation = Tween<Offset>(
         begin: start,
@@ -173,18 +156,14 @@ class _ReviewScreenState extends State<ReviewScreen>
         ),
       );
     });
-
     await _exitController.forward(from: 0);
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
     if (_isAnimating) return;
-
     setState(() {
       _dragOffset += details.delta;
 
-      // Keep the gesture bounded so the card stays visually connected
-      // to the finger while still allowing a strong swipe.
       _dragOffset = Offset(
         _dragOffset.dx.clamp(-280.0, 280.0),
         _dragOffset.dy.clamp(-70.0, 220.0),
@@ -207,9 +186,6 @@ class _ReviewScreenState extends State<ReviewScreen>
       return;
     }
 
-    // Distance is the primary trigger. Velocity only triggers a swipe when
-    // it points in the same direction as the drag, preventing accidental
-    // slow/diagonal gestures from being treated as an answer.
     final horizontalVelocity = velocity;
 
     if (_dragOffset.dx > 190 ||
@@ -226,21 +202,19 @@ class _ReviewScreenState extends State<ReviewScreen>
     }
   }
 
+  // تم الإصلاح: جعل دالة عودة البطاقة للمركز أكثر مرونة واحترافية
   Future<void> _returnCardToCenter() async {
     if (_isAnimating || _dragOffset == Offset.zero) return;
 
-    final start = _dragOffset;
-
     setState(() {
       _isAnimating = true;
-      _dragOffset = Offset.zero;
       _exitAnimation = Tween<Offset>(
-        begin: start,
+        begin: _dragOffset,
         end: Offset.zero,
       ).animate(
         CurvedAnimation(
           parent: _exitController,
-          curve: Curves.easeOutCubic,
+          curve: Curves.easeOutBack, // يضيف تأثيراً مطاطياً جميلاً عند الإفلات
         ),
       );
     });
@@ -249,14 +223,13 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     if (!mounted) return;
 
-    _exitController.reset();
-
-    if (!mounted) return;
-
     setState(() {
+      _dragOffset = Offset.zero;
       _isAnimating = false;
       _exitAnimation = null;
     });
+    
+    _exitController.reset();
   }
 
   void _revealCard() {
@@ -499,13 +472,11 @@ class _ReviewScreenState extends State<ReviewScreen>
         : remembered
             ? _green
             : _red;
-
     final text = deleting
         ? 'حذف'
         : remembered
             ? 'تذكرت'
             : 'لم أتذكر';
-
     final icon = deleting
         ? Icons.delete_outline_rounded
         : remembered
@@ -581,10 +552,9 @@ class _ReviewScreenState extends State<ReviewScreen>
         (_dragOffset.dx.abs() / 320).clamp(0.0, 1.0).toDouble();
     final double verticalProgress =
         (_dragOffset.dy / 220).clamp(0.0, 1.0).toDouble();
-
     final double scale = 1.0 - (horizontalProgress * 0.035);
     final rotation = _dragOffset.dx * 0.00075;
-
+    
     final borderColor = _dragOffset.dx > 30
         ? _green.withOpacity((_dragOffset.dx / 150).clamp(0.0, 1.0).toDouble())
         : _dragOffset.dx < -30
@@ -611,18 +581,16 @@ class _ReviewScreenState extends State<ReviewScreen>
       ),
     );
 
+    // تم الإصلاح الجذري هنا: لا يوجد ضرب في أبعاد الشاشة
     if (_exitAnimation != null) {
       card = AnimatedBuilder(
         animation: _exitAnimation!,
         builder: (context, child) {
           final offset = _exitAnimation!.value;
           return Transform.translate(
-            offset: Offset(
-              offset.dx * MediaQuery.sizeOf(context).width,
-              offset.dy * MediaQuery.sizeOf(context).height,
-            ),
+            offset: offset, // تطبيق البيكسلات مباشرة بدون ضربها في أبعاد الشاشة
             child: Transform.rotate(
-              angle: offset.dx * 0.35,
+              angle: offset.dx * 0.00075, // دوران ناعم ومطابق للمنطق العام
               child: child,
             ),
           );
@@ -656,7 +624,7 @@ class _ReviewScreenState extends State<ReviewScreen>
     final previewText = germanOnFront ? word.german : word.translation;
     final previewDirection =
         germanOnFront ? TextDirection.ltr : TextDirection.rtl;
-
+        
     return SizedBox(
       height: 520,
       child: Padding(
@@ -716,7 +684,7 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     final double nextScale =
         0.94 + ((_dragOffset.dx.abs() / 320).clamp(0.0, 1.0).toDouble() * 0.04);
-
+        
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -751,7 +719,6 @@ class _ReviewScreenState extends State<ReviewScreen>
                     builder: (context, constraints) {
                       final double cardHeight =
                           constraints.maxHeight.clamp(420.0, 560.0).toDouble();
-
                       return SizedBox(
                         height: cardHeight,
                         width: double.infinity,
