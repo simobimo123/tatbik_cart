@@ -31,34 +31,60 @@ class WordRepository {
         0;
   }
 
-  Future<int> dueCount() async {
+  Future<int> dueCount({int? categoryId, String? difficulty}) async {
     final db = await _databaseHelper.database;
     final now = DateTime.now().toIso8601String();
 
+    final filters = <String>['(r.due_at IS NULL OR r.due_at<=?)'];
+    final args = <Object?>[now];
+    if (categoryId != null) {
+      filters.add('w.category_id=?');
+      args.add(categoryId);
+    }
+    if (difficulty != null) {
+      filters.add('w.difficulty=?');
+      args.add(difficulty);
+    }
+
     return Sqflite.firstIntValue(
           await db.rawQuery(
-            'SELECT COUNT(*) '
-            'FROM words w '
+            'SELECT COUNT(*) FROM words w '
             'INNER JOIN reviews r ON r.word_id=w.id '
-            'WHERE r.due_at IS NULL OR r.due_at<=?',
-            [now],
+            'WHERE ' + filters.join(' AND '),
+            args,
           ),
         ) ??
         0;
   }
 
-  Future<List<WordModel>> dueWords({int limit = 300}) async {
+  Future<List<WordModel>> dueWords({
+    int limit = 300,
+    int? categoryId,
+    String? difficulty,
+  }) async {
     final db = await _databaseHelper.database;
     final now = DateTime.now().toIso8601String();
+
+    final filters = <String>['(r.due_at IS NULL OR r.due_at<=?)'];
+    final args = <Object?>[now];
+    if (categoryId != null) {
+      filters.add('w.category_id=?');
+      args.add(categoryId);
+    }
+    if (difficulty != null) {
+      filters.add('w.difficulty=?');
+      args.add(difficulty);
+    }
+    args.add(limit);
 
     final rows = await db.rawQuery(
       'SELECT w.* '
       'FROM words w '
       'INNER JOIN reviews r ON r.word_id=w.id '
-      'WHERE r.due_at IS NULL OR r.due_at<=? '
+      'WHERE ' + filters.join(' AND ') + ' '
       'ORDER BY COALESCE(r.due_at, "") ASC,w.id ASC '
       'LIMIT ?',
-      [now, limit],
+      args,
     );
 
     return rows.map(WordModel.fromMap).toList();
@@ -69,6 +95,8 @@ class WordRepository {
     required String translation,
     required String example,
     required String exampleTranslation,
+    String difficulty = 'unspecified',
+    int? categoryId,
   }) async {
     final db = await _databaseHelper.database;
     final now = DateTime.now().toIso8601String();
@@ -79,6 +107,8 @@ class WordRepository {
         'translation': translation.trim(),
         'example': example.trim(),
         'example_translation': exampleTranslation.trim(),
+        'difficulty': difficulty,
+        'category_id': categoryId,
         'builtin': 0,
         'created_at': now,
       });
@@ -97,9 +127,10 @@ class WordRepository {
     final db = await _databaseHelper.database;
 
     final rows = await db.rawQuery(
-      'SELECT w.* '
+      'SELECT w.*, c.name AS category_name '
       'FROM words w '
       'INNER JOIN reviews r ON r.word_id=w.id '
+      'LEFT JOIN categories c ON c.id=w.category_id '
       'ORDER BY w.german COLLATE NOCASE ASC,w.id ASC',
     );
 
