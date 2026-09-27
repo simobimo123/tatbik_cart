@@ -17,7 +17,7 @@ class _ImportWordsScreenState extends State<ImportWordsScreen> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final file = await FilePicker.pickFile(type: FileType.custom, allowedExtensions: ['json']);
+      final file = await FilePicker.pickFile(type: FileType.any);
       if (file == null) {
         if (mounted) setState(() => _busy = false);
         return;
