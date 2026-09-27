@@ -9,15 +9,19 @@ class DiscoveryScreen extends StatefulWidget {
   State<DiscoveryScreen> createState() => _DiscoveryScreenState();
 }
 
-class _DiscoveryScreenState extends State<DiscoveryScreen> {
+class _DiscoveryScreenState extends State<DiscoveryScreen>
+    with SingleTickerProviderStateMixin {
   final _repository = DiscoveryRepository();
 
   WordModel? _word;
+  int _total = 0;
   int _remaining = 0;
   bool _loading = true;
   bool _busy = false;
-  String? _feedback;
-  bool _feedbackPositive = false;
+  bool _showMeaning = false;
+  bool _isDragging = false;
+
+  double _dragDx = 0;
 
   static const _primary = Color(0xFF5B5FEF);
   static const _green = Color(0xFF16A88F);
@@ -26,14 +30,16 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   @override
   void initState() {
     super.initState();
-    _loadNext();
+    _loadNext(firstLoad: true);
   }
 
-  Future<void> _loadNext() async {
-    setState(() {
-      _loading = true;
-      _feedback = null;
-    });
+  Future<void> _loadNext({bool firstLoad = false}) async {
+    if (firstLoad) {
+      setState(() {
+        _loading = true;
+        _showMeaning = false;
+      });
+    }
 
     final words = await _repository.getPendingWords();
     final count = await _repository.pendingCount();
@@ -41,10 +47,17 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     if (!mounted) return;
 
     setState(() {
+      if (firstLoad) {
+        _total = count;
+      }
+
       _word = words.isEmpty ? null : words.first;
       _remaining = count;
       _loading = false;
       _busy = false;
+      _showMeaning = false;
+      _dragDx = 0;
+      _isDragging = false;
     });
   }
 
@@ -52,68 +65,95 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     final word = _word;
     if (word == null || _busy) return;
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _showMeaning = !known;
+    });
 
     await _repository.answer(word, known: known);
 
     if (!mounted) return;
 
-    setState(() {
-      _feedbackPositive = known;
-      _feedback = known
-          ? 'ممتاز، لن تدخل هذه الكلمة في المراجعة.'
-          : 'ستدخل هذه الكلمة الآن في بطاقات المراجعة.';
-    });
+    await Future.delayed(
+      Duration(milliseconds: known ? 180 : 650),
+    );
 
-    await Future.delayed(const Duration(milliseconds: 650));
     if (!mounted) return;
-
     await _loadNext();
   }
 
-  Widget _buildCompleted() {
+  void _handleDragUpdate(DragUpdateDetails details) {
+    if (_busy || _word == null) return;
+
+    setState(() {
+      _isDragging = true;
+      _dragDx = (_dragDx + details.delta.dx).clamp(-260.0, 260.0);
+    });
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    if (_busy || _word == null) return;
+
+    final velocity = details.primaryVelocity ?? 0;
+
+    if (_dragDx > 145 || velocity > 1500) {
+      _answer(true);
+    } else if (_dragDx < -145 || velocity < -1500) {
+      _answer(false);
+    } else {
+      setState(() {
+        _dragDx = 0;
+        _isDragging = false;
+      });
+    }
+  }
+
+  Widget _buildEmptyState() {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'اكتشاف الكلمات',
-          style: TextStyle(fontWeight: FontWeight.w700),
+          style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(26),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 96,
-                height: 96,
+                width: 104,
+                height: 104,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE9F9F5),
-                  borderRadius: BorderRadius.circular(30),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE9E8FF), Color(0xFFF3F2FF)],
+                  ),
+                  borderRadius: BorderRadius.circular(34),
                 ),
                 child: const Icon(
                   Icons.explore_rounded,
-                  size: 46,
-                  color: _green,
+                  size: 50,
+                  color: _primary,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
               const Text(
-                'انتهت الكلمات المتاحة حاليًا',
+                'لا توجد كلمات جديدة',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 9),
               const Text(
-                'أضف كلمات جديدة إلى قاعدة الكلمات، وستظهر هنا تلقائيًا لاكتشافها.',
+                'أضف كلماتك إلى قاعدة الكلمات الخاصة بالتطبيق، وستظهر هنا تلقائيًا.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.black54,
-                  height: 1.45,
+                  height: 1.5,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -128,168 +168,258 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: const Text('اكتشاف الكلمات')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
       );
     }
 
     final word = _word;
     if (word == null) {
-      return _buildCompleted();
+      return _buildEmptyState();
     }
 
-    final progress =
-        _remaining == 0 ? 0.0 : ((_remaining - 1) / _remaining).clamp(0.0, 1.0);
+    final processed = (_total - _remaining).clamp(0, _total);
+    final progress = _total == 0
+        ? 0.0
+        : (processed / _total).clamp(0.0, 1.0).toDouble();
+
+    final dragProgress = (_dragDx.abs() / 160).clamp(0.0, 1.0);
+    final isKnownDrag = _dragDx > 0;
 
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'اكتشاف الكلمات',
-          style: TextStyle(fontWeight: FontWeight.w700),
+          style: TextStyle(fontWeight: FontWeight.w800),
         ),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'هل تعرف هذه الكلمة؟',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                ),
-                Text(
-                  '$_remaining متبقية',
-                  style: const TextStyle(
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            ClipRRect(
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(5),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: LinearProgressIndicator(
-                minHeight: 7,
+                minHeight: 5,
                 value: progress,
                 backgroundColor: const Color(0xFFE5E7EF),
                 valueColor: const AlwaysStoppedAnimation(_primary),
               ),
             ),
-            const SizedBox(height: 22),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              child: Container(
-                key: ValueKey(word.id),
-                constraints: const BoxConstraints(minHeight: 390),
-                padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'هل تعرف هذه الكلمة؟',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'قرر قبل أن ترى معناها.',
+                        style: TextStyle(
+                          color: Colors.black54,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFE8E9F2),
+                    ),
+                  ),
+                  child: Text(
+                    '$_remaining متبقية',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            GestureDetector(
+              onPanUpdate: _handleDragUpdate,
+              onPanEnd: _handleDragEnd,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                transform: Matrix4.identity()
+                  ..translate(_dragDx, 0.0)
+                  ..rotateZ(_dragDx * 0.00065),
+                transformAlignment: Alignment.center,
+                constraints: const BoxConstraints(minHeight: 465),
+                padding: const EdgeInsets.fromLTRB(24, 30, 24, 26),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: const Color(0xFFE9EAF2)),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: _isDragging
+                        ? (isKnownDrag
+                            ? _green.withOpacity(0.5)
+                            : _red.withOpacity(0.5))
+                        : const Color(0xFFE8E9F2),
+                    width: 2,
+                  ),
                   boxShadow: const [
                     BoxShadow(
-                      color: Color(0x10000000),
-                      blurRadius: 22,
-                      offset: Offset(0, 9),
+                      color: Color(0x12000000),
+                      blurRadius: 26,
+                      offset: Offset(0, 12),
                     ),
                   ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 70,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEEF0FF),
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: const Icon(
-                        Icons.auto_stories_rounded,
-                        color: _primary,
-                        size: 34,
+                    AnimatedScale(
+                      scale: 1 + dragProgress * 0.035,
+                      duration: const Duration(milliseconds: 120),
+                      child: Container(
+                        width: 76,
+                        height: 76,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFECEBFF), Color(0xFFF4F2FF)],
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: const Icon(
+                          Icons.auto_stories_rounded,
+                          color: _primary,
+                          size: 38,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 24),
                     const Text(
                       'Deutsch',
                       style: TextStyle(
                         color: Colors.black45,
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 9),
+                    const SizedBox(height: 10),
                     Text(
                       word.german,
                       textDirection: TextDirection.ltr,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.7,
                           ),
                     ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'اختر إجابتك بالأسفل',
-                      style: TextStyle(
-                        color: Colors.black45,
-                        fontSize: 14,
+                    const SizedBox(height: 13),
+                    if (_showMeaning) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F8FC),
+                          borderRadius: BorderRadius.circular(19),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'المعنى',
+                              style: TextStyle(
+                                color: Colors.black45,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              word.translation,
+                              textDirection: TextDirection.rtl,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: _primary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              word.example,
+                              textDirection: TextDirection.ltr,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                height: 1.5,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_feedback != null)
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      const Text(
+                        'اسحب يمينًا إذا كنت تعرفها',
+                        style: TextStyle(
+                          color: Colors.black45,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'اسحب يسارًا إذا لم تكن تعرفها',
+                        style: TextStyle(
+                          color: Colors.black45,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                    if (_isDragging) ...[
+                      const SizedBox(height: 20),
                       AnimatedOpacity(
-                        duration: const Duration(milliseconds: 180),
-                        opacity: 1,
+                        opacity: dragProgress,
+                        duration: const Duration(milliseconds: 100),
                         child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: _feedbackPositive
-                                ? const Color(0xFFE9F9F5)
-                                : const Color(0xFFFFF0F0),
-                            borderRadius: BorderRadius.circular(17),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 15,
+                            vertical: 9,
                           ),
-                          child: Column(
-                            children: [
-                              Icon(
-                                _feedbackPositive
-                                    ? Icons.check_circle_rounded
-                                    : Icons.school_rounded,
-                                color: _feedbackPositive ? _green : _red,
-                              ),
-                              const SizedBox(height: 7),
-                              Text(
-                                _feedback!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.4,
-                                ),
-                              ),
-                              if (!_feedbackPositive) ...[
-                                const SizedBox(height: 6),
-                                Text(
-                                  word.translation,
-                                  textDirection: TextDirection.rtl,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: _primary,
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ],
+                          decoration: BoxDecoration(
+                            color: isKnownDrag
+                                ? _green.withOpacity(0.95)
+                                : _red.withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            isKnownDrag ? 'أعرفها' : 'لا أعرفها',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -302,7 +432,10 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                     onPressed: _busy ? null : () => _answer(false),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _red,
-                      side: const BorderSide(color: _red, width: 1.5),
+                      side: const BorderSide(
+                        color: _red,
+                        width: 1.5,
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     icon: const Icon(Icons.close_rounded),
@@ -323,13 +456,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 11),
             const Text(
-              'الكلمة التي تقول عنها «لا أعرفها» تدخل مباشرة في المراجعة.',
+              'النقر على «لا أعرفها» يضيف الكلمة مباشرة إلى المراجعة.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.black45,
                 fontSize: 12,
+                height: 1.4,
               ),
             ),
           ],
