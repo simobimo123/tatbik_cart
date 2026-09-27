@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import '../../../data/models/word_model.dart';
 import '../../../data/repositories/review_repository.dart';
@@ -22,6 +24,8 @@ class _ReviewScreenState extends State<ReviewScreen>
   // Number of times each word has been answered during this review session.
   // This controls where the card is placed back into the current queue.
   final Map<int, int> _sessionAnswerCount = {};
+  final Map<int, bool> _germanFront = {};
+  final Random _random = Random();
   bool _isAnimating = false;
 
   late final AnimationController _exitController;
@@ -49,6 +53,10 @@ class _ReviewScreenState extends State<ReviewScreen>
   void dispose() {
     _exitController.dispose();
     super.dispose();
+  }
+
+  bool _isGermanFront(WordModel word) {
+    return _germanFront.putIfAbsent(word.id, () => _random.nextBool());
   }
 
   Future<void> _load() async {
@@ -302,6 +310,12 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
   Widget _buildCardContent(WordModel word) {
+    final germanOnFront = _isGermanFront(word);
+    final frontText = germanOnFront ? word.german : word.translation;
+    final frontDirection =
+        germanOnFront ? TextDirection.ltr : TextDirection.rtl;
+    final frontLabel = germanOnFront ? 'Deutsch' : 'الترجمة';
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 26, 24, 20),
       child: Column(
@@ -322,8 +336,17 @@ class _ReviewScreenState extends State<ReviewScreen>
           ),
           const SizedBox(height: 20),
           Text(
-            word.german,
-            textDirection: TextDirection.ltr,
+            frontLabel,
+            style: const TextStyle(
+              color: Colors.black45,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            frontText,
+            textDirection: frontDirection,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.displaySmall?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -370,6 +393,12 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
   Widget _buildAnswerArea(WordModel word) {
+    final germanOnFront = _isGermanFront(word);
+    final answerText = germanOnFront ? word.translation : word.german;
+    final answerDirection =
+        germanOnFront ? TextDirection.rtl : TextDirection.ltr;
+    final answerLabel = germanOnFront ? 'الترجمة' : 'Deutsch';
+
     return Column(
       children: [
         Container(
@@ -385,8 +414,17 @@ class _ReviewScreenState extends State<ReviewScreen>
           child: Column(
             children: [
               Text(
-                word.translation,
-                textDirection: TextDirection.rtl,
+                answerLabel,
+                style: const TextStyle(
+                  color: Colors.black45,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                answerText,
+                textDirection: answerDirection,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
@@ -611,6 +649,11 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
   Widget _buildBackCardPreview(WordModel word) {
+    final germanOnFront = _isGermanFront(word);
+    final previewText = germanOnFront ? word.german : word.translation;
+    final previewDirection =
+        germanOnFront ? TextDirection.ltr : TextDirection.rtl;
+
     return SizedBox(
       height: 520,
       child: Padding(
@@ -633,8 +676,8 @@ class _ReviewScreenState extends State<ReviewScreen>
             ),
             const SizedBox(height: 17),
             Text(
-              word.german,
-              textDirection: TextDirection.ltr,
+              previewText,
+              textDirection: previewDirection,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 28,
