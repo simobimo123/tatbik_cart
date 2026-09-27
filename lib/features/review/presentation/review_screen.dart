@@ -73,10 +73,19 @@ class _ReviewScreenState extends State<ReviewScreen>
     final direction =
         remembered ? const Offset(1.25, 0.02) : const Offset(-1.25, 0.02);
 
+    // Mark the card as busy immediately so a second gesture cannot start
+    // another animation while this one is finishing.
+    setState(() => _isAnimating = true);
+
+    // Start saving immediately, but do not make the visual transition wait
+    // for SQLite. The card should always leave the screen smoothly.
+    final saveFuture = _reviews.review(word.id, remembered);
+
     await _animateCardExit(direction);
 
-    await _reviews.review(word.id, remembered);
-
+    // Move the card in the queue immediately after the exit animation.
+    // The card behind it therefore becomes the new current card without
+    // ever rendering the old card as the next card.
     if (!mounted) return;
 
     setState(() {
@@ -85,17 +94,15 @@ class _ReviewScreenState extends State<ReviewScreen>
 
       _sessionAnswerCount[word.id] = answerCount + 1;
 
-      // Remove the current card first. The next card then takes its place.
       _queue.removeAt(_index);
 
       if (_queue.isNotEmpty) {
         if (remembered && hasBeenAnsweredBefore) {
-          // The second (or later) successful recall sends the word
-          // to the end of this review session.
+          // A word remembered again goes to the end of this session.
           _queue.add(word);
         } else {
-          // First successful recall: show it again after 10 cards.
-          // Failed recall: show it again after 30 cards.
+          // First "remembered": after 10 other cards.
+          // "Not remembered": after 30 other cards.
           final delay = remembered ? 10 : 30;
           final insertAt = (_index + delay).clamp(0, _queue.length).toInt();
           _queue.insert(insertAt, word);
@@ -111,6 +118,10 @@ class _ReviewScreenState extends State<ReviewScreen>
         _index = _queue.length - 1;
       }
     });
+
+    // Complete persistence after the UI has already moved on.
+    // Any database error is kept separate from the card animation.
+    await saveFuture;
   }
 
   Future<void> _delete() async {
@@ -144,14 +155,13 @@ class _ReviewScreenState extends State<ReviewScreen>
     final start = _dragOffset;
 
     setState(() {
-      _isAnimating = true;
       _exitAnimation = Tween<Offset>(
         begin: start,
         end: target,
       ).animate(
         CurvedAnimation(
           parent: _exitController,
-          curve: Curves.easeInCubic,
+          curve: Curves.easeOutCubic,
         ),
       );
     });
@@ -189,11 +199,19 @@ class _ReviewScreenState extends State<ReviewScreen>
       return;
     }
 
-    if (_dragOffset.dx > 115 || velocity > 700) {
+    // Distance is the primary trigger. Velocity only triggers a swipe when
+    // it points in the same direction as the drag, preventing accidental
+    // slow/diagonal gestures from being treated as an answer.
+    final horizontalVelocity = velocity;
+
+    if (_dragOffset.dx > 110 ||
+        (_dragOffset.dx > 35 && horizontalVelocity > 850)) {
       _answer(true);
-    } else if (_dragOffset.dx < -115 || velocity < -700) {
+    } else if (_dragOffset.dx < -110 ||
+        (_dragOffset.dx < -35 && horizontalVelocity < -850)) {
       _answer(false);
-    } else if (_dragOffset.dy > 135) {
+    } else if (_dragOffset.dy > 135 &&
+        _dragOffset.dy > _dragOffset.dx.abs() * 0.75) {
       _delete();
     } else {
       _returnCardToCenter();
@@ -226,6 +244,7 @@ class _ReviewScreenState extends State<ReviewScreen>
       _dragOffset = Offset.zero;
       _isAnimating = false;
       _exitAnimation = null;
+      _exitController.reset();
     });
   }
 
