@@ -6,11 +6,13 @@ class WordCatalogItem {
     required this.german,
     required this.translation,
     required this.example,
+    required this.exampleTranslation,
   });
 
   final String german;
   final String translation;
   final String example;
+  final String exampleTranslation;
 }
 
 class WordCatalog {
@@ -39,8 +41,13 @@ class WordCatalog {
       final german = item['german']?.toString().trim() ?? '';
       final translation = item['translation']?.toString().trim() ?? '';
       final example = item['example']?.toString().trim() ?? '';
+      final exampleTranslation =
+          item['example_translation']?.toString().trim() ?? '';
 
-      if (german.isEmpty || translation.isEmpty || example.isEmpty) {
+      if (german.isEmpty ||
+          translation.isEmpty ||
+          example.isEmpty ||
+          exampleTranslation.isEmpty) {
         continue;
       }
 
@@ -49,6 +56,7 @@ class WordCatalog {
           german: german,
           translation: translation,
           example: example,
+          exampleTranslation: exampleTranslation,
         ),
       );
     }
