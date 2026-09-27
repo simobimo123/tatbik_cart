@@ -195,7 +195,7 @@ class _ExerciseState extends State<ExerciseScreen>{
   List<Map<String,Object?>> words=[]; Map<String,Object?>? question; List<String> options=[]; String? selected; int score=0;
   @override void initState(){super.initState();start();}
   Future<void> start()async{words=await LocalStore.words();next();}
-  void next(){if(words.length<4)return;words.shuffle();question=words.first;final set=<String>{question!['translation'] as String};while(set.length<4)set.add(words[set.length]['translation'] as String);options=set.toList()..shuffle();setState(()=>selected=null);}
+  void next(){if(words.length<4)return;words.shuffle();question=words.first;final set=<String>{question!['translation'] as String};for(final word in words){if(set.length>=4)break;set.add(word['translation'] as String);}options=set.toList()..shuffle();setState(()=>selected=null);}
   void choose(String option){if(selected!=null)return;setState((){selected=option;if(option==question!['translation'])score++;});}
   @override Widget build(BuildContext context){if(question==null)return const Scaffold(body:Center(child:CircularProgressIndicator()));final german=question!['german'] as String;return Scaffold(
     appBar:AppBar(title:Text('التمارين • النقاط '+score.toString())),
