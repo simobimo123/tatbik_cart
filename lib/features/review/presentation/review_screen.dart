@@ -200,9 +200,9 @@ class _ReviewScreenState extends State<ReviewScreen>
     final verticalDistance = _dragOffset.dy;
 
     if (!_revealed &&
-        horizontalDistance < 18 &&
-        verticalDistance.abs() < 18 &&
-        velocity.abs() < 100) {
+        horizontalDistance < 12 &&
+        verticalDistance.abs() < 12 &&
+        velocity.abs() < 70) {
       setState(() => _revealed = true);
       return;
     }
@@ -212,14 +212,14 @@ class _ReviewScreenState extends State<ReviewScreen>
     // slow/diagonal gestures from being treated as an answer.
     final horizontalVelocity = velocity;
 
-    if (_dragOffset.dx > 110 ||
-        (_dragOffset.dx > 35 && horizontalVelocity > 850)) {
+    if (_dragOffset.dx > 150 ||
+        (_dragOffset.dx > 80 && horizontalVelocity > 1100)) {
       _answer(true);
-    } else if (_dragOffset.dx < -110 ||
-        (_dragOffset.dx < -35 && horizontalVelocity < -850)) {
+    } else if (_dragOffset.dx < -150 ||
+        (_dragOffset.dx < -80 && horizontalVelocity < -1100)) {
       _answer(false);
-    } else if (_dragOffset.dy > 135 &&
-        _dragOffset.dy > _dragOffset.dx.abs() * 0.75) {
+    } else if (_dragOffset.dy > 175 &&
+        _dragOffset.dy > _dragOffset.dx.abs() * 0.85) {
       _delete();
     } else {
       _returnCardToCenter();
