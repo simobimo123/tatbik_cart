@@ -17,6 +17,22 @@ class WordImportRepository {
 
   final DatabaseHelper _databaseHelper;
 
+  String _normalizeDifficulty(String? value) {
+    switch (value?.trim().toLowerCase()) {
+      case 'easy':
+      case 'سهل':
+        return 'easy';
+      case 'medium':
+      case 'متوسط':
+        return 'medium';
+      case 'hard':
+      case 'صعب':
+        return 'hard';
+      default:
+        return 'unspecified';
+    }
+  }
+
   Future<WordImportResult> importJson(String content, {required WordImportTarget target}) async {
     final decoded = jsonDecode(content);
     final dynamic rawWords = decoded is List ? decoded : decoded is Map ? decoded['words'] : null;
@@ -32,12 +48,16 @@ class WordImportRepository {
       final translation = raw['translation']?.toString().trim() ?? '';
       final example = raw['example']?.toString().trim() ?? '';
       final exampleTranslation = raw['example_translation']?.toString().trim() ?? '';
+      final difficulty = _normalizeDifficulty(raw['difficulty']?.toString());
+      final category = raw['category']?.toString().trim() ?? '';
       if (german.isEmpty || translation.isEmpty || example.isEmpty) continue;
       items.add({
         'german': german,
         'translation': translation,
         'example': example,
         'example_translation': exampleTranslation,
+        'difficulty': difficulty,
+        'category': category,
       });
     }
 
@@ -62,6 +82,25 @@ class WordImportRepository {
     await db.transaction((txn) async {
       for (final item in items) {
         final key = item['german']!.toLowerCase();
+        int? categoryId;
+        final categoryName = item['category']?.trim() ?? '';
+        if (categoryName.isNotEmpty) {
+          final categoryRows = await txn.query(
+            'categories',
+            columns: ['id'],
+            where: 'LOWER(name)=LOWER(?)',
+            whereArgs: [categoryName],
+            limit: 1,
+          );
+          if (categoryRows.isNotEmpty) {
+            categoryId = categoryRows.first['id'] as int;
+          } else {
+            categoryId = await txn.insert('categories', {
+              'name': categoryName,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          }
+        }
         if (!importedKeys.add(key)) {
           skipped++;
           continue;
@@ -90,6 +129,8 @@ class WordImportRepository {
                 'translation': item['translation'],
                 'example': item['example'],
                 'example_translation': item['example_translation'],
+                'difficulty': item['difficulty'],
+                'category_id': categoryId,
                 'builtin': 1,
               },
               where: 'id=?',
@@ -104,6 +145,8 @@ class WordImportRepository {
             'translation': item['translation'],
             'example': item['example'],
             'example_translation': item['example_translation'],
+            'difficulty': item['difficulty'],
+            'category_id': categoryId,
             'builtin': 1,
             'created_at': DateTime.now().toIso8601String(),
           });
@@ -127,6 +170,8 @@ class WordImportRepository {
               'translation': item['translation'],
               'example': item['example'],
               'example_translation': item['example_translation'],
+              'difficulty': item['difficulty'],
+              'category_id': categoryId,
             },
             where: 'id=?',
             whereArgs: [existingId],
@@ -151,6 +196,8 @@ class WordImportRepository {
           'translation': item['translation'],
           'example': item['example'],
           'example_translation': item['example_translation'],
+          'difficulty': item['difficulty'],
+          'category_id': categoryId,
           'builtin': 0,
           'created_at': DateTime.now().toIso8601String(),
         });
