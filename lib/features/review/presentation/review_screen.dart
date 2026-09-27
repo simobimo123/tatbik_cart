@@ -1,8 +1,11 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../../core/config/learning_config.dart';
 import '../../../data/models/word_model.dart';
 import '../../../data/repositories/review_repository.dart';
 import '../../../data/repositories/word_repository.dart';
+import '../presentation/add_review_word_screen.dart';
+import '../../export/presentation/export_words_screen.dart';
 
 class ReviewScreen extends StatefulWidget {
   const ReviewScreen({super.key});
@@ -16,13 +19,17 @@ class _ReviewScreenState extends State<ReviewScreen>
   final _words = WordRepository();
   final _reviews = ReviewRepository();
 
-  List<WordModel> _queue = [];
-  int _index = 0;
-  bool _revealed = false;
-
+  final Map<int, int> _sessionReturnAtStep = {};
   final Map<int, int> _sessionAnswerCount = {};
   final Map<int, bool> _germanFront = {};
   final Random _random = Random();
+
+  List<WordModel> _queue = [];
+  int _sessionStep = 0;
+  int _sessionAnswered = 0;
+
+  bool _loading = true;
+  bool _revealed = false;
   bool _isAnimating = false;
 
   late final AnimationController _exitController;
@@ -42,7 +49,8 @@ class _ReviewScreenState extends State<ReviewScreen>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _load();
+
+    _load(resetSession: true);
   }
 
   @override
@@ -55,27 +63,45 @@ class _ReviewScreenState extends State<ReviewScreen>
     return _germanFront.putIfAbsent(word.id, () => _random.nextBool());
   }
 
-  Future<void> _load() async {
-    final queue = await _words.dueWords();
+  Future<void> _load({required bool resetSession}) async {
+    if (mounted) {
+      setState(() => _loading = true);
+    }
+
+    final queue = await _words.dueWords(limit: 300);
 
     if (!mounted) return;
+
     setState(() {
       _queue = queue;
-      _index = 0;
+      _loading = false;
       _revealed = false;
       _dragOffset = Offset.zero;
+
+      if (resetSession) {
+        _sessionReturnAtStep.clear();
+        _sessionAnswerCount.clear();
+        _sessionStep = 0;
+        _sessionAnswered = 0;
+      }
+
+      _prepareNextCard();
     });
   }
 
-  Future<void> _answer(bool remembered) async {
-    if (_isAnimating || _queue.isEmpty || _index >= _queue.length) {
-      return;
-    }
+  Future<void> _reloadAfterAddingWord() async {
+    await _load(resetSession: true);
+  }
 
-    final word = _queue[_index];
-    
-    // تم الإصلاح: استخدام مسافة بالبيكسلات بدلاً من النسب العشرية لخروج البطاقة
-    final direction = remembered ? const Offset(500, 40) : const Offset(-500, 40);
+  Future<void> _answer(bool remembered) async {
+    if (_isAnimating || _queue.isEmpty) return;
+
+    final word = _queue.first;
+    final answerCount = _sessionAnswerCount[word.id] ?? 0;
+    final hasBeenAnsweredBefore = answerCount > 0;
+
+    final direction =
+        remembered ? const Offset(500, 40) : const Offset(-500, 40);
 
     setState(() => _isAnimating = true);
 
@@ -86,32 +112,28 @@ class _ReviewScreenState extends State<ReviewScreen>
     if (!mounted) return;
 
     setState(() {
-      final answerCount = _sessionAnswerCount[word.id] ?? 0;
-      final hasBeenAnsweredBefore = answerCount > 0;
+      _queue.removeAt(0);
+
+      // كل إجابة ناجحة في هذه الجلسة تمثل بطاقة أخرى ظهرت.
+      _sessionStep++;
+      _sessionAnswered++;
 
       _sessionAnswerCount[word.id] = answerCount + 1;
 
-      _queue.removeAt(_index);
+      if (remembered && hasBeenAnsweredBefore) {
+        // بعد أن يعرفها المستخدم للمرة الثانية:
+        // تُنقل لنهاية الحزمة ولا تعود لها أولوية داخل الجلسة.
+        _sessionReturnAtStep.remove(word.id);
+        _queue.add(word);
+      } else {
+        final delay = remembered
+            ? LearningConfig.reviewRememberedDelayCards
+            : LearningConfig.reviewForgottenDelayCards;
 
-      if (_queue.isNotEmpty) {
-        if (remembered && hasBeenAnsweredBefore) {
-          // عندما تظهر البطاقة مرة ثانية ويعرفها المستخدم:
-          // ننقلها إلى نهاية الحزمة، فلا تعود للمنافسة مع البطاقات
-          // التي لم تثبت بعد.
-          _queue.add(word);
-        } else {
-          // المنطق المطلوب:
-          // - "لم أتذكر" أول مرة  -> بعد 10 بطاقات أخرى.
-          // - "تذكرت" أول مرة     -> بعد 30 بطاقة أخرى.
-          //
-          // بعد حذف البطاقة الحالية، أول بطاقة في _queue هي البطاقة
-          // التالية التي سيشاهدها المستخدم. لذلك insertAt = delay
-          // يعني أن المستخدم سيرى بالضبط delay بطاقات قبل عودة هذه البطاقة.
-          final delay = remembered ? 30 : 10;
-          final insertAt = delay.clamp(0, _queue.length).toInt();
-
-          _queue.insert(insertAt, word);
-        }
+        // لا نعد البطاقة الحالية نفسها. يبدأ العد من البطاقات
+        // التي ستظهر بعدها.
+        _sessionReturnAtStep[word.id] = _sessionStep + delay;
+        _queue.add(word);
       }
 
       _revealed = false;
@@ -119,36 +141,107 @@ class _ReviewScreenState extends State<ReviewScreen>
       _isAnimating = false;
       _exitAnimation = null;
 
-      if (_index >= _queue.length && _queue.isNotEmpty) {
-        _index = _queue.length - 1;
-      }
+      _prepareNextCard();
     });
 
     await saveFuture;
+
+    // عندما نقترب من نهاية الدفعة، نطلب بطاقات مستحقة أخرى من قاعدة
+    // البيانات حتى لا يتوقف المستخدم عند حد الدفعة 300.
+    if (mounted && _queue.length < 50) {
+      await _appendMoreDueWords();
+    }
+  }
+
+  Future<void> _appendMoreDueWords() async {
+    final more = await _words.dueWords(limit: 300);
+    if (!mounted || more.isEmpty) return;
+
+    setState(() {
+      final existingIds = _queue.map((word) => word.id).toSet();
+
+      for (final word in more) {
+        if (!existingIds.contains(word.id)) {
+          _queue.add(word);
+          existingIds.add(word.id);
+        }
+      }
+
+      _prepareNextCard();
+    });
+  }
+
+  void _prepareNextCard() {
+    if (_queue.isEmpty) return;
+
+    var bestDueIndex = -1;
+    var bestDueStep = 1 << 60;
+    var firstAvailableIndex = -1;
+
+    for (var i = 0; i < _queue.length; i++) {
+      final word = _queue[i];
+      final dueStep = _sessionReturnAtStep[word.id];
+
+      if (dueStep == null) {
+        firstAvailableIndex = i;
+        break;
+      }
+
+      if (dueStep <= _sessionStep && dueStep < bestDueStep) {
+        bestDueStep = dueStep;
+        bestDueIndex = i;
+      }
+    }
+
+    final targetIndex =
+        bestDueIndex >= 0 ? bestDueIndex : firstAvailableIndex;
+
+    if (targetIndex < 0 || targetIndex == 0) return;
+
+    final word = _queue.removeAt(targetIndex);
+    _queue.insert(0, word);
+  }
+
+  int? _findEligibleIndex() {
+    var firstAvailable = -1;
+
+    for (var i = 0; i < _queue.length; i++) {
+      final dueStep = _sessionReturnAtStep[_queue[i].id];
+
+      if (dueStep == null) {
+        firstAvailable = i;
+        break;
+      }
+
+      if (dueStep <= _sessionStep) {
+        return i;
+      }
+    }
+
+    return firstAvailable >= 0 ? firstAvailable : null;
   }
 
   Future<void> _delete() async {
-    if (_isAnimating || _queue.isEmpty || _index >= _queue.length) {
-      return;
-    }
+    if (_isAnimating || _queue.isEmpty) return;
 
-    final word = _queue[_index];
+    final word = _queue.first;
 
-    // تم الإصلاح: مسافة خروج سفلية واضحة بالبيكسلات
     await _animateCardExit(const Offset(0, 500));
     await _words.remove(word.id);
 
     if (!mounted) return;
+
     setState(() {
-      _queue.removeAt(_index);
+      _queue.removeAt(0);
+      _sessionReturnAtStep.remove(word.id);
+      _sessionAnswerCount.remove(word.id);
+      _germanFront.remove(word.id);
       _revealed = false;
       _dragOffset = Offset.zero;
       _isAnimating = false;
       _exitAnimation = null;
 
-      if (_index >= _queue.length && _queue.isNotEmpty) {
-        _index = _queue.length - 1;
-      }
+      _prepareNextCard();
     });
   }
 
@@ -156,6 +249,7 @@ class _ReviewScreenState extends State<ReviewScreen>
     if (!mounted) return;
 
     final start = _dragOffset;
+
     setState(() {
       _exitAnimation = Tween<Offset>(
         begin: start,
@@ -167,14 +261,16 @@ class _ReviewScreenState extends State<ReviewScreen>
         ),
       );
     });
+
     await _exitController.forward(from: 0);
+    _exitController.reset();
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
     if (_isAnimating) return;
+
     setState(() {
       _dragOffset += details.delta;
-
       _dragOffset = Offset(
         _dragOffset.dx.clamp(-280.0, 280.0),
         _dragOffset.dy.clamp(-70.0, 220.0),
@@ -197,13 +293,11 @@ class _ReviewScreenState extends State<ReviewScreen>
       return;
     }
 
-    final horizontalVelocity = velocity;
-
     if (_dragOffset.dx > 190 ||
-        (_dragOffset.dx > 135 && horizontalVelocity > 1400)) {
+        (_dragOffset.dx > 135 && velocity > 1400)) {
       _answer(true);
     } else if (_dragOffset.dx < -190 ||
-        (_dragOffset.dx < -135 && horizontalVelocity < -1400)) {
+        (_dragOffset.dx < -135 && velocity < -1400)) {
       _answer(false);
     } else if (_dragOffset.dy > 210 &&
         _dragOffset.dy > _dragOffset.dx.abs() * 0.95) {
@@ -213,7 +307,6 @@ class _ReviewScreenState extends State<ReviewScreen>
     }
   }
 
-  // تم الإصلاح: جعل دالة عودة البطاقة للمركز أكثر مرونة واحترافية
   Future<void> _returnCardToCenter() async {
     if (_isAnimating || _dragOffset == Offset.zero) return;
 
@@ -225,7 +318,7 @@ class _ReviewScreenState extends State<ReviewScreen>
       ).animate(
         CurvedAnimation(
           parent: _exitController,
-          curve: Curves.easeOutBack, // يضيف تأثيراً مطاطياً جميلاً عند الإفلات
+          curve: Curves.easeOutBack,
         ),
       );
     });
@@ -239,55 +332,162 @@ class _ReviewScreenState extends State<ReviewScreen>
       _isAnimating = false;
       _exitAnimation = null;
     });
-    
+
     _exitController.reset();
   }
 
   void _revealCard() {
     if (_isAnimating || _revealed) return;
-
     setState(() => _revealed = true);
+  }
+
+  Future<void> _openAddWord() async {
+    final added = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const AddReviewWordScreen(),
+      ),
+    );
+
+    if (added == true && mounted) {
+      await _reloadAfterAddingWord();
+    }
+  }
+
+  Future<void> _openExport() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ExportWordsScreen(),
+      ),
+    );
   }
 
   Widget _buildEmptyState() {
     return Scaffold(
-      appBar: AppBar(title: const Text('المراجعة')),
+      appBar: AppBar(
+        title: const Text(
+          'المراجعة',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        actions: [
+          IconButton(
+            onPressed: _openAddWord,
+            tooltip: 'إضافة كلمة للمراجعة',
+            icon: const Icon(Icons.add_rounded),
+          ),
+          IconButton(
+            onPressed: _openExport,
+            tooltip: 'تصدير الكلمات',
+            icon: const Icon(Icons.file_download_outlined),
+          ),
+        ],
+      ),
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(26),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 92,
-                height: 92,
+                width: 104,
+                height: 104,
                 decoration: BoxDecoration(
                   color: const Color(0xFFE9F9F5),
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(34),
                 ),
                 child: const Icon(
                   Icons.check_rounded,
-                  size: 46,
+                  size: 50,
                   color: _green,
                 ),
               ),
               const SizedBox(height: 20),
               const Text(
-                'أحسنت! لا توجد مراجعات الآن',
+                'لا توجد بطاقات مستحقة الآن',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 9),
               const Text(
-                'عد لاحقًا وستجد الكلمات عندما يحين وقتها.',
+                'يمكنك إضافة كلمة مباشرة إلى المراجعة أو العودة لاحقًا عند حلول موعد الكلمات التالية.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.black54,
+                  height: 1.5,
                   fontSize: 14,
                 ),
+              ),
+              const SizedBox(height: 22),
+              FilledButton.icon(
+                onPressed: _openAddWord,
+                icon: const Icon(Icons.playlist_add_rounded),
+                label: const Text('إضافة كلمة للمراجعة'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWaitingState() {
+    final delayedCount = _queue.length;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'المراجعة',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        actions: [
+          IconButton(
+            onPressed: _openAddWord,
+            tooltip: 'إضافة كلمة للمراجعة',
+            icon: const Icon(Icons.add_rounded),
+          ),
+          IconButton(
+            onPressed: _openExport,
+            tooltip: 'تصدير الكلمات',
+            icon: const Icon(Icons.file_download_outlined),
+          ),
+        ],
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(26),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.hourglass_bottom_rounded,
+                size: 58,
+                color: _primary,
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'انتهت البطاقات المتاحة لهذه اللحظة',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 9),
+              Text(
+                '$delayedCount بطاقة ما زالت مؤجلة حتى تمر البطاقات المطلوبة قبل عودتها.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.black54,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 22),
+              FilledButton.icon(
+                onPressed: _openAddWord,
+                icon: const Icon(Icons.playlist_add_rounded),
+                label: const Text('إضافة بطاقة جديدة'),
               ),
             ],
           ),
@@ -429,6 +629,19 @@ class _ReviewScreenState extends State<ReviewScreen>
                   color: Colors.black87,
                 ),
               ),
+              if (word.exampleTranslation.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Text(
+                  word.exampleTranslation,
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    height: 1.45,
+                    fontSize: 13,
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -483,11 +696,13 @@ class _ReviewScreenState extends State<ReviewScreen>
         : remembered
             ? _green
             : _red;
+
     final text = deleting
         ? 'حذف'
         : remembered
             ? 'تذكرت'
             : 'لم أتذكر';
+
     final icon = deleting
         ? Icons.delete_outline_rounded
         : remembered
@@ -559,18 +774,22 @@ class _ReviewScreenState extends State<ReviewScreen>
       );
     }
 
-    final double horizontalProgress =
+    final horizontalProgress =
         (_dragOffset.dx.abs() / 320).clamp(0.0, 1.0).toDouble();
-    final double verticalProgress =
+    final verticalProgress =
         (_dragOffset.dy / 220).clamp(0.0, 1.0).toDouble();
-    final double scale = 1.0 - (horizontalProgress * 0.035);
+    final scale = 1.0 - (horizontalProgress * 0.035);
     final rotation = _dragOffset.dx * 0.00075;
-    
+
     final borderColor = _dragOffset.dx > 30
-        ? _green.withOpacity((_dragOffset.dx / 150).clamp(0.0, 1.0).toDouble())
+        ? _green.withOpacity(
+            (_dragOffset.dx / 150).clamp(0.0, 1.0).toDouble(),
+          )
         : _dragOffset.dx < -30
             ? _red.withOpacity(
-                (_dragOffset.dx.abs() / 150).clamp(0.0, 1.0).toDouble(),
+                (_dragOffset.dx.abs() / 150)
+                    .clamp(0.0, 1.0)
+                    .toDouble(),
               )
             : verticalProgress > 0.15
                 ? Colors.orange.withOpacity(verticalProgress)
@@ -592,16 +811,16 @@ class _ReviewScreenState extends State<ReviewScreen>
       ),
     );
 
-    // تم الإصلاح الجذري هنا: لا يوجد ضرب في أبعاد الشاشة
     if (_exitAnimation != null) {
       card = AnimatedBuilder(
         animation: _exitAnimation!,
         builder: (context, child) {
           final offset = _exitAnimation!.value;
+
           return Transform.translate(
-            offset: offset, // تطبيق البيكسلات مباشرة بدون ضربها في أبعاد الشاشة
+            offset: offset,
             child: Transform.rotate(
-              angle: offset.dx * 0.00075, // دوران ناعم ومطابق للمنطق العام
+              angle: offset.dx * 0.00075,
               child: child,
             ),
           );
@@ -635,7 +854,7 @@ class _ReviewScreenState extends State<ReviewScreen>
     final previewText = germanOnFront ? word.german : word.translation;
     final previewDirection =
         germanOnFront ? TextDirection.ltr : TextDirection.rtl;
-        
+
     return SizedBox(
       height: 520,
       child: Padding(
@@ -683,41 +902,70 @@ class _ReviewScreenState extends State<ReviewScreen>
 
   @override
   Widget build(BuildContext context) {
-    final empty = _queue.isEmpty || _index < 0 || _index >= _queue.length;
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    if (empty) {
+    if (_queue.isEmpty) {
       return _buildEmptyState();
     }
 
-    final word = _queue[_index];
-    final nextWord =
-        _index + 1 < _queue.length ? _queue[_index + 1] : null;
+    final eligibleIndex = _findEligibleIndex();
 
-    final double nextScale =
-        0.94 + ((_dragOffset.dx.abs() / 320).clamp(0.0, 1.0).toDouble() * 0.04);
-        
+    if (eligibleIndex == null) {
+      return _buildWaitingState();
+    }
+
+    if (eligibleIndex != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_isAnimating) {
+          setState(_prepareNextCard);
+        }
+      });
+    }
+
+    final word = _queue.first;
+    final nextWord =
+        _queue.length > 1 ? _queue[1] : null;
+
+    final nextScale =
+        0.94 +
+        ((_dragOffset.dx.abs() / 320).clamp(0.0, 1.0).toDouble() * 0.04);
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          'المراجعة ' + (_index + 1).toString() + '/' + _queue.length.toString(),
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(5),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                minHeight: 5,
-                value: ((_index + 1) / _queue.length).clamp(0.0, 1.0).toDouble(),
-                backgroundColor: const Color(0xFFE5E7EF),
-                valueColor: const AlwaysStoppedAnimation(_primary),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'المراجعة',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            Text(
+              'تمت الإجابة عن $_sessionAnswered بطاقة',
+              style: const TextStyle(
+                color: Colors.black45,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ),
+          ],
         ),
+        actions: [
+          IconButton(
+            onPressed: _openAddWord,
+            tooltip: 'إضافة كلمة للمراجعة',
+            icon: const Icon(Icons.add_rounded),
+          ),
+          IconButton(
+            onPressed: _openExport,
+            tooltip: 'تصدير الكلمات',
+            icon: const Icon(Icons.file_download_outlined),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -728,8 +976,9 @@ class _ReviewScreenState extends State<ReviewScreen>
                 child: Center(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final double cardHeight =
+                      final cardHeight =
                           constraints.maxHeight.clamp(420.0, 560.0).toDouble();
+
                       return SizedBox(
                         height: cardHeight,
                         width: double.infinity,
