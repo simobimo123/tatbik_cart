@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../data/repositories/word_export_repository.dart';
+import '../../import/presentation/import_words_screen.dart';
 
 class ExportWordsScreen extends StatefulWidget {
   const ExportWordsScreen({super.key});
@@ -121,6 +122,18 @@ class _ExportWordsScreenState extends State<ExportWordsScreen> {
             ),
           ),
           const SizedBox(height: 18),
+          _option(
+            icon: Icons.file_upload_rounded,
+            title: 'استيراد ملف JSON',
+            subtitle: 'أدخل مجموعة كلمات إلى الاكتشاف أو المراجعة مباشرة',
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ImportWordsScreen(),
+                ),
+              );
+            },
+          ),
           _option(
             icon: Icons.library_books_rounded,
             title: 'تصدير كل الكلمات',
