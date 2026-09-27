@@ -37,15 +37,28 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_queue.isEmpty || _index < 0 || _index >= _queue.length) {
+    final empty = _queue.isEmpty || _index < 0 || _index >= _queue.length;
+    if (empty) {
       return Scaffold(
         appBar: AppBar(title: const Text('المراجعة')),
-        body: const Center(child: Text('لا توجد كلمات مستحقة للمراجعة الآن.')),
+        body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Container(width: 84, height: 84,
+            decoration: BoxDecoration(color: const Color(0xFFE9F9F5), borderRadius: BorderRadius.circular(28)),
+            child: const Icon(Icons.check_rounded, size: 42, color: Color(0xFF16A88F))),
+          const SizedBox(height: 18),
+          const Text('أحسنت! لا توجد مراجعات الآن', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 7),
+          const Text('عد لاحقًا وستجد الكلمات عندما يحين وقتها.', style: TextStyle(color: Colors.black54)),
+        ])),
       );
     }
+
     final word = _queue[_index];
     return Scaffold(
-      appBar: AppBar(title: Text('مراجعة ' + (_index + 1).toString() + '/' + _queue.length.toString())),
+      appBar: AppBar(
+        title: Text('المراجعة ' + (_index + 1).toString() + '/' + _queue.length.toString(),
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+      ),
       body: GestureDetector(
         onTap: () => setState(() => _revealed = true),
         onHorizontalDragEnd: (details) {
@@ -62,32 +75,64 @@ class _ReviewScreenState extends State<ReviewScreen> {
           if ((details.primaryVelocity ?? 0) > 500) _delete();
         },
         child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Card(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(word.german, textDirection: TextDirection.ltr, style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 30),
-                    if (_revealed) ...[
-                      Text(word.translation, style: Theme.of(context).textTheme.headlineSmall),
-                      const SizedBox(height: 15),
-                      Text(word.example, textDirection: TextDirection.ltr, textAlign: TextAlign.center),
-                      const SizedBox(height: 30),
-                      Row(children: [
-                        Expanded(child: OutlinedButton(onPressed: () => _answer(false), child: const Text('لم أتذكر'))),
-                        const SizedBox(width: 10),
-                        Expanded(child: FilledButton(onPressed: () => _answer(true), child: const Text('تذكرت'))),
-                      ]),
-                    ] else
-                      const Text('اضغط للكشف'),
-                    const SizedBox(height: 20),
-                    const Text('يمين: تذكرت • يسار: لم أتذكر • أسفل: حذف', textAlign: TextAlign.center),
-                  ],
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 22),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween(begin: .96, end: 1.0).animate(
+                  CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
                 ),
+                child: child,
+              ),
+            ),
+            child: Card(
+              key: ValueKey(word.id.toString() + '-' + _revealed.toString()),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(28),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Container(width: 62, height: 62,
+                    decoration: BoxDecoration(color: const Color(0xFFEEF0FF), borderRadius: BorderRadius.circular(20)),
+                    child: const Icon(Icons.style_rounded, color: Color(0xFF5B5FEF), size: 30)),
+                  const SizedBox(height: 25),
+                  Text(word.german, textDirection: TextDirection.ltr,
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 28),
+                  if (_revealed) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(color: const Color(0xFFF7F8FC), borderRadius: BorderRadius.circular(18)),
+                      child: Column(children: [
+                        Text(word.translation, textDirection: TextDirection.rtl,
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700, color: const Color(0xFF5B5FEF))),
+                        const SizedBox(height: 12),
+                        Text(word.example, textDirection: TextDirection.ltr,
+                          textAlign: TextAlign.center, style: const TextStyle(height: 1.4)),
+                      ]),
+                    ),
+                    const SizedBox(height: 22),
+                    Row(children: [
+                      Expanded(child: OutlinedButton.icon(
+                        onPressed: () => _answer(false),
+                        icon: const Icon(Icons.close_rounded), label: const Text('لم أتذكر'))),
+                      const SizedBox(width: 10),
+                      Expanded(child: FilledButton.icon(
+                        onPressed: () => _answer(true),
+                        icon: const Icon(Icons.check_rounded), label: const Text('تذكرت'))),
+                    ]),
+                  ] else ...[
+                    const Text('اضغط على البطاقة للكشف', style: TextStyle(color: Colors.black54)),
+                    const SizedBox(height: 12),
+                    const Icon(Icons.touch_app_rounded, color: Colors.black38),
+                  ],
+                  const Spacer(),
+                  const Text('يمين: تذكرت • يسار: لم أتذكر • اسحب للأسفل للحذف',
+                    textAlign: TextAlign.center, style: TextStyle(color: Colors.black38, fontSize: 12)),
+                ]),
               ),
             ),
           ),
