@@ -32,7 +32,7 @@ class WordExportRepository {
     final words = await _queryWords(reviewOnly: reviewOnly);
 
     final payload = {
-      'version': 1,
+      'version': 2,
       'language': 'de',
       'type': reviewOnly ? 'review_words' : 'all_words',
       'exported_at': DateTime.now().toIso8601String(),
