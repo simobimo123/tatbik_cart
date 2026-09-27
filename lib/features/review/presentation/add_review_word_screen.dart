@@ -108,7 +108,7 @@ class _AddReviewWordScreenState extends State<AddReviewWordScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر حفظ الكلمة: ' + e.toString())),
+        SnackBar(content: Text('تعذر حفظ الكلمة: $e')),
       );
     }
   }
