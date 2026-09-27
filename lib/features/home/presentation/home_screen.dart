@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/word_repository.dart';
 import '../../../data/repositories/discovery_repository.dart';
-import '../../words/presentation/add_word_screen.dart';
-import '../../words/presentation/library_screen.dart';
 import '../../review/presentation/review_screen.dart';
+import '../../review/presentation/add_review_word_screen.dart';
+import '../../words/presentation/library_screen.dart';
 import '../../exercises/presentation/exercise_screen.dart';
 import '../../discovery/presentation/discovery_screen.dart';
+import '../../export/presentation/export_words_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,9 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
   }
 
   @override
@@ -94,7 +93,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 IconButton(
-                  onPressed: () => _open(const AddWordScreen()),
+                  onPressed: () => _open(const AddReviewWordScreen()),
+                  tooltip: 'إضافة إلى المراجعة',
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.white,
                   ),
@@ -139,20 +139,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () => _open(const ReviewScreen()),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF5B5FEF),
-                          ),
-                          icon: const Icon(Icons.play_arrow_rounded),
-                          label: const Text('ابدأ المراجعة'),
-                        ),
-                      ),
-                    ],
+                  FilledButton.icon(
+                    onPressed: () => _open(const ReviewScreen()),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF5B5FEF),
+                    ),
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('ابدأ المراجعة'),
                   ),
                 ],
               ),
@@ -172,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: _stat(
                         Icons.menu_book_rounded,
                         values[0].toString(),
-                        'كلمة محفوظة',
+                        'إجمالي الكلمات',
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -189,9 +183,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 22),
             FutureBuilder<int>(
-              future: _discoveryRepository.pendingCount(),
+              future: _discoveryRepository.availableCount(),
               builder: (context, snapshot) {
-                final pending = snapshot.data ?? 0;
+                final available = snapshot.data ?? 0;
 
                 return Material(
                   color: Colors.white,
@@ -212,93 +206,59 @@ class _HomeScreenState extends State<HomeScreen> {
                           end: Alignment.bottomRight,
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 52,
-                                height: 52,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE7E5FF),
-                                  borderRadius: BorderRadius.circular(17),
-                                ),
-                                child: const Icon(
-                                  Icons.explore_rounded,
-                                  color: Color(0xFF5B5FEF),
-                                  size: 28,
-                                ),
-                              ),
-                              const SizedBox(width: 13),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'اكتشاف الكلمات',
-                                      style: text.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    const Text(
-                                      'اختبر معرفتك بالكلمات قبل أن تدخل مرحلة المراجعة.',
-                                      style: TextStyle(
-                                        color: Colors.black54,
-                                        fontSize: 13,
-                                        height: 1.35,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                size: 17,
-                                color: Colors.black38,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 13,
-                              vertical: 10,
-                            ),
+                            width: 54,
+                            height: 54,
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(15),
+                              color: const Color(0xFFE7E5FF),
+                              borderRadius: BorderRadius.circular(18),
                             ),
-                            child: Row(
+                            child: const Icon(
+                              Icons.explore_rounded,
+                              color: Color(0xFF5B5FEF),
+                              size: 29,
+                            ),
+                          ),
+                          const SizedBox(width: 13),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(
-                                  Icons.auto_awesome_rounded,
-                                  size: 18,
-                                  color: Color(0xFF5B5FEF),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    pending == 0
-                                        ? 'لا توجد كلمات جديدة الآن'
-                                        : '$pending كلمة لم تكتشفها بعد',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13,
-                                    ),
+                                Text(
+                                  'اكتشاف الكلمات',
+                                  style: text.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w900,
                                   ),
                                 ),
-                                if (pending > 0)
-                                  const Text(
-                                    'ابدأ',
-                                    style: TextStyle(
-                                      color: Color(0xFF5B5FEF),
-                                      fontWeight: FontWeight.w800,
-                                    ),
+                                const SizedBox(height: 3),
+                                const Text(
+                                  'اعرف الكلمات التي تتقنها، وأرسل غير المعروفة إلى المراجعة.',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 13,
+                                    height: 1.35,
                                   ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  available == 0
+                                      ? 'لا توجد كلمات متاحة الآن'
+                                      : '$available كلمة متاحة الآن',
+                                  style: const TextStyle(
+                                    color: Color(0xFF5B5FEF),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                               ],
                             ),
+                          ),
+                          const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 17,
+                            color: Colors.black38,
                           ),
                         ],
                       ),
@@ -316,11 +276,32 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 10),
             _action(
-              'قاموس الكلمات',
-              'ابحث وتصفح وأضف كلماتك',
+              'المراجعة',
+              'راجع الكلمات المستحقة وفق نظام التكرار',
+              Icons.school_rounded,
+              const Color(0xFFE9F9F5),
+              () => _open(const ReviewScreen()),
+            ),
+            _action(
+              'إضافة إلى المراجعة',
+              'أضف كلمة بنفسك إلى بطاقات المراجعة',
+              Icons.playlist_add_rounded,
+              const Color(0xFFFFF3E8),
+              () => _open(const AddReviewWordScreen()),
+            ),
+            _action(
+              'قاعدة الكلمات',
+              'تصفح قاعدة الكلمات والبحث فيها',
               Icons.menu_book_rounded,
               const Color(0xFFEEF0FF),
               () => _open(const LibraryScreen()),
+            ),
+            _action(
+              'التصدير',
+              'صدّر الكلمات والجمل والترجمات في ملف JSON',
+              Icons.file_download_rounded,
+              const Color(0xFFEFF0FF),
+              () => _open(const ExportWordsScreen()),
             ),
             _action(
               'التمارين',
@@ -328,13 +309,6 @@ class _HomeScreenState extends State<HomeScreen> {
               Icons.extension_rounded,
               const Color(0xFFE9F9F5),
               () => _open(const ExerciseScreen()),
-            ),
-            _action(
-              'إضافة كلمة',
-              'أضف كلمة وترجمة ومثال',
-              Icons.add_rounded,
-              const Color(0xFFFFF3E8),
-              () => _open(const AddWordScreen()),
             ),
           ],
         ),
