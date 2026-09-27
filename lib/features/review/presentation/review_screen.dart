@@ -786,22 +786,22 @@ class _ReviewScreenState extends State<ReviewScreen>
     final rotation = _dragOffset.dx * 0.00075;
 
     final borderColor = _dragOffset.dx > 30
-        ? _green.withOpacity(
+        ? _green.withValues(alpha: 
             (_dragOffset.dx / 150).clamp(0.0, 1.0).toDouble(),
           )
         : _dragOffset.dx < -30
-            ? _red.withOpacity(
+            ? _red.withValues(alpha: 
                 (_dragOffset.dx.abs() / 150)
                     .clamp(0.0, 1.0)
                     .toDouble(),
               )
             : verticalProgress > 0.15
-                ? Colors.orange.withOpacity(verticalProgress)
+                ? Colors.orange.withValues(alpha: verticalProgress)
                 : Colors.transparent;
 
     Widget card = Card(
       elevation: 10,
-      shadowColor: Colors.black.withOpacity(0.16),
+      shadowColor: Colors.black.withValues(alpha: 0.16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(28),
         side: BorderSide(
@@ -1000,8 +1000,8 @@ class _ReviewScreenState extends State<ReviewScreen>
                                   duration: const Duration(milliseconds: 180),
                                   curve: Curves.easeOutCubic,
                                   transform: Matrix4.identity()
-                                    ..translate(0.0, 12.0)
-                                    ..scale(nextScale),
+                                    ..translateByDouble(0.0, 12.0, 0.0, 1.0)
+                                    ..scaleByDouble(nextScale, nextScale, nextScale, 1.0),
                                   transformAlignment: Alignment.center,
                                   child: _buildCard(
                                     nextWord,
