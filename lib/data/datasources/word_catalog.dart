@@ -7,18 +7,38 @@ class WordCatalogItem {
     required this.translation,
     required this.example,
     required this.exampleTranslation,
+    this.difficulty = 'unspecified',
+    this.category,
   });
 
   final String german;
   final String translation;
   final String example;
   final String exampleTranslation;
+  final String difficulty;
+  final String? category;
 }
 
 class WordCatalog {
   const WordCatalog._();
 
   static const assetPath = 'assets/data/german_words.json';
+
+  static String _normalizeDifficulty(String? value) {
+    switch (value?.trim().toLowerCase()) {
+      case 'easy':
+      case 'سهل':
+        return 'easy';
+      case 'medium':
+      case 'متوسط':
+        return 'medium';
+      case 'hard':
+      case 'صعب':
+        return 'hard';
+      default:
+        return 'unspecified';
+    }
+  }
 
   static Future<List<WordCatalogItem>> load() async {
     final raw = await rootBundle.loadString(assetPath);
@@ -43,6 +63,8 @@ class WordCatalog {
       final example = item['example']?.toString().trim() ?? '';
       final exampleTranslation =
           item['example_translation']?.toString().trim() ?? '';
+      final difficulty = _normalizeDifficulty(item['difficulty']?.toString());
+      final category = item['category']?.toString().trim();
 
       if (german.isEmpty ||
           translation.isEmpty ||
@@ -57,6 +79,8 @@ class WordCatalog {
           translation: translation,
           example: example,
           exampleTranslation: exampleTranslation,
+          difficulty: difficulty,
+          category: category == null || category.isEmpty ? null : category,
         ),
       );
     }
