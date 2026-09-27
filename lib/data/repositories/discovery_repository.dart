@@ -15,7 +15,9 @@ class DiscoveryRepository {
       'SELECT w.* '
       'FROM words w '
       'LEFT JOIN word_discoveries d ON d.word_id=w.id '
+      'LEFT JOIN reviews r ON r.word_id=w.id '
       'WHERE w.builtin=1 '
+      'AND r.word_id IS NULL '
       'AND (d.word_id IS NULL OR d.known=1) '
       'ORDER BY '
       'CASE WHEN d.word_id IS NULL THEN 0 ELSE 1 END ASC, '
@@ -50,7 +52,9 @@ class DiscoveryRepository {
             'SELECT COUNT(*) '
             'FROM words w '
             'LEFT JOIN word_discoveries d ON d.word_id=w.id '
+            'LEFT JOIN reviews r ON r.word_id=w.id '
             'WHERE w.builtin=1 '
+            'AND r.word_id IS NULL '
             'AND (d.word_id IS NULL OR d.known=1)',
           ),
         ) ??
