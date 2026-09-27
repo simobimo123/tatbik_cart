@@ -733,7 +733,7 @@ class _ReviewScreenState extends State<ReviewScreen>
                 vertical: 8,
               ),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.94),
+                color: color.withValues(alpha: 0.94),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Row(
