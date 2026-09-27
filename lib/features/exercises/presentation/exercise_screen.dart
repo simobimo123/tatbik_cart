@@ -44,7 +44,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   final _random = Random();
 
   List<WordModel> _words = [];
-  _Question? _question;
+  _Question? _currentQuestion;
   int _score = 0;
   int _answered = 0;
   int _streak = 0;
@@ -65,7 +65,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       setState(() {
         _words = words;
         _loading = false;
-        _question = words.length >= 2 ? _makeQuestion(words) : null;
+        _currentQuestion = words.length >= 2 ? _makeQuestion(words) : null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -217,9 +217,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   }
 
   void _choose(int index) {
-    if (_selected != null || _question == null) return;
+    if (_selected != null || _currentQuestion == null) return;
 
-    final correct = index == _question!.correctIndex;
+    final correct = index == _currentQuestion!.correctIndex;
     setState(() {
       _selected = index;
       _answered++;
@@ -235,7 +235,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   void _next() {
     if (_words.length < 2) return;
     setState(() {
-      _question = _makeQuestion(_words);
+      _currentQuestion = _makeQuestion(_words);
       _selected = null;
     });
   }
@@ -269,11 +269,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       );
     }
 
-    if (_words.length < 2 || _question == null) {
+    if (_words.length < 2 || _currentQuestion == null) {
       return _empty();
     }
 
-    final q = _question!;
+    final q = _currentQuestion!;
 
     return Scaffold(
       appBar: AppBar(
