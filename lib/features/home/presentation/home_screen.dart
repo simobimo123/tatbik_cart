@@ -22,8 +22,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _open(Widget page) async {
     await Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (_, animation, __) => page,
-        transitionsBuilder: (_, animation, __, child) => FadeTransition(
+        pageBuilder: (_, animation, _) => page,
+        transitionsBuilder: (_, animation, _, child) => FadeTransition(
           opacity: CurvedAnimation(
             parent: animation,
             curve: Curves.easeOut,
