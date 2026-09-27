@@ -4,6 +4,7 @@ import '../../words/presentation/add_word_screen.dart';
 import '../../words/presentation/library_screen.dart';
 import '../../review/presentation/review_screen.dart';
 import '../../exercises/presentation/exercise_screen.dart';
+import '../../discovery/presentation/discovery_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -97,6 +98,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 22),
             Text('استكشف', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 10),
+            _action('اكتشاف الكلمات', 'اكتشف كلمات جديدة وحدد ما تعرفه', Icons.explore_rounded, const Color(0xFFEFF0FF),
+                () => _open(const DiscoveryScreen())),
             _action('قاموس الكلمات', 'ابحث وتصفح وأضف كلماتك', Icons.menu_book_rounded, const Color(0xFFEEF0FF),
                 () => _open(const LibraryScreen())),
             _action('التمارين', 'اختبر نفسك بطريقة تفاعلية', Icons.extension_rounded, const Color(0xFFE9F9F5),
