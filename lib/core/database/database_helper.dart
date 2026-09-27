@@ -16,7 +16,7 @@ class DatabaseHelper {
 
     _database = await openDatabase(
       path.join(directory, 'deutsch_lernen.db'),
-      version: 4,
+      version: 5,
       onCreate: (db, version) => _createTables(db),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -63,6 +63,28 @@ class DatabaseHelper {
           );
         }
 
+        if (oldVersion < 5) {
+          await db.execute(
+            'CREATE TABLE IF NOT EXISTS categories ('
+            'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+            'name TEXT NOT NULL UNIQUE, '
+            'created_at TEXT NOT NULL'
+            ')',
+          );
+          await db.execute(
+            "ALTER TABLE words ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'unspecified'",
+          );
+          await db.execute(
+            'ALTER TABLE words ADD COLUMN category_id INTEGER',
+          );
+          await db.execute(
+            'CREATE INDEX IF NOT EXISTS words_category ON words(category_id)',
+          );
+          await db.execute(
+            'CREATE INDEX IF NOT EXISTS words_difficulty ON words(difficulty)',
+          );
+        }
+
         if (oldVersion < 4) {
           await db.execute(
             "ALTER TABLE word_discoveries ADD COLUMN discovery_order INTEGER NOT NULL DEFAULT 0",
@@ -106,6 +128,8 @@ class DatabaseHelper {
       'translation TEXT NOT NULL, '
       'example TEXT NOT NULL, '
       'example_translation TEXT NOT NULL DEFAULT "", '
+      'difficulty TEXT NOT NULL DEFAULT "unspecified", '
+      'category_id INTEGER, '
       'builtin INTEGER NOT NULL DEFAULT 0, '
       'created_at TEXT NOT NULL'
       ')',
@@ -129,6 +153,14 @@ class DatabaseHelper {
       'due_step INTEGER NOT NULL DEFAULT 0, '
       'times_seen INTEGER NOT NULL DEFAULT 0, '
       'discovery_order INTEGER NOT NULL DEFAULT 0'
+      ')',
+    );
+
+    await db.execute(
+      'CREATE TABLE categories ('
+      'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+      'name TEXT NOT NULL UNIQUE, '
+      'created_at TEXT NOT NULL'
       ')',
     );
 
@@ -160,11 +192,33 @@ class DatabaseHelper {
           limit: 1,
         );
 
+        int? categoryId;
+        if (item.category != null && item.category!.trim().isNotEmpty) {
+          final name = item.category!.trim();
+          final existingCategory = await txn.query(
+            'categories',
+            columns: ['id'],
+            where: 'LOWER(name)=LOWER(?)',
+            whereArgs: [name],
+            limit: 1,
+          );
+          if (existingCategory.isNotEmpty) {
+            categoryId = existingCategory.first['id'] as int;
+          } else {
+            categoryId = await txn.insert('categories', {
+              'name': name,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          }
+        }
+
         final values = {
           'german': item.german,
           'translation': item.translation,
           'example': item.example,
           'example_translation': item.exampleTranslation,
+          'difficulty': item.difficulty,
+          'category_id': categoryId,
           'builtin': 1,
           'created_at': DateTime.now().toIso8601String(),
         };
