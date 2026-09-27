@@ -68,6 +68,54 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
     );
   }
 
+  Future<void> _deleteCategory(CategoryModel category) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text(
+          'حذف التصنيف؟',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: Text(
+          category.wordCount == 0
+              ? 'سيتم حذف التصنيف «${category.name}».'
+              : 'سيتم حذف التصنيف «${category.name}» وحذف جميع الكلمات المرتبطة به من قاعدة البيانات ومن نظام المراجعة. هذا الإجراء لا يمكن التراجع عنه.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFE95D6A),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || confirmed != true) return;
+
+    try {
+      await _categories.delete(category.id);
+      if (!mounted) return;
+
+      setState(_refresh);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم حذف التصنيف «${category.name}»')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حذف التصنيف: $e')),
+      );
+    }
+  }
+
   Future<void> _addCategory() async {
     final name = await showDialog<String>(
       context: context,
@@ -348,6 +396,7 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
             : 'كلمات المراجعة في هذا التصنيف',
         background: const Color(0xFFF0EFFF),
         onTap: () => _openSession(categoryId: category.id),
+        onDelete: () => _deleteCategory(category),
       ),
     );
   }
@@ -445,6 +494,7 @@ class _ReviewTile extends StatelessWidget {
     required this.subtitle,
     required this.background,
     required this.onTap,
+    this.onDelete,
   });
 
   final IconData icon;
@@ -453,6 +503,7 @@ class _ReviewTile extends StatelessWidget {
   final String subtitle;
   final Color background;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -499,7 +550,24 @@ class _ReviewTile extends StatelessWidget {
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
               ),
               const SizedBox(width: 5),
-              const Icon(Icons.arrow_forward_ios_rounded, size: 15, color: Colors.black38),
+              if (onDelete != null) ...[
+                IconButton(
+                  onPressed: onDelete,
+                  tooltip: 'حذف التصنيف',
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFE95D6A),
+                    size: 21,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 2),
+              ],
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 15,
+                color: Colors.black38,
+              ),
             ],
           ),
         ),
