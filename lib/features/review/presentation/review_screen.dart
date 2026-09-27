@@ -233,13 +233,14 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     setState(() {
       _isAnimating = true;
+      _dragOffset = Offset.zero;
       _exitAnimation = Tween<Offset>(
         begin: start,
         end: Offset.zero,
       ).animate(
         CurvedAnimation(
           parent: _exitController,
-          curve: Curves.easeOutBack,
+          curve: Curves.easeOutCubic,
         ),
       );
     });
@@ -248,11 +249,13 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     if (!mounted) return;
 
+    _exitController.reset();
+
+    if (!mounted) return;
+
     setState(() {
-      _dragOffset = Offset.zero;
       _isAnimating = false;
       _exitAnimation = null;
-      _exitController.reset();
     });
   }
 
