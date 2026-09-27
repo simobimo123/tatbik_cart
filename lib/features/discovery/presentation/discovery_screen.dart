@@ -14,8 +14,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   WordModel? _word;
   int _available = 0;
-  int _step = 0;
-
   bool _loading = true;
   bool _busy = false;
   bool _showMeaning = false;
@@ -41,14 +39,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     final word = await _repository.nextWord();
     final available = await _repository.availableCount();
-    final step = await _repository.currentStep();
-
     if (!mounted) return;
 
     setState(() {
       _word = word;
       _available = available;
-      _step = step;
       _loading = false;
       _busy = false;
       _showMeaning = false;
