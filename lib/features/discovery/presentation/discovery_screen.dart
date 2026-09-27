@@ -187,21 +187,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           'اكتشاف الكلمات',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(5),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                minHeight: 5,
-                value: (dragProgress * 0.0),
-                backgroundColor: const Color(0xFFE5E7EF),
-                valueColor: const AlwaysStoppedAnimation(_primary),
-              ),
-            ),
-          ),
-        ),
+
       ),
       body: SafeArea(
         child: ListView(
