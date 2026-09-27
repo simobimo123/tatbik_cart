@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/word_repository.dart';
 import '../../../data/repositories/discovery_repository.dart';
-import '../../review/presentation/review_screen.dart';
+import '../../review/presentation/review_home_screen.dart';
 import '../../review/presentation/add_review_word_screen.dart';
 import '../../words/presentation/library_screen.dart';
 import '../../exercises/presentation/exercise_screen.dart';
@@ -141,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 18),
                   FilledButton.icon(
-                    onPressed: () => _open(const ReviewScreen()),
+                    onPressed: () => _open(const ReviewHomeScreen()),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: const Color(0xFF5B5FEF),
