@@ -16,10 +16,10 @@ class WordRepository {
       'SELECT w.*, c.name AS category_name '
       'FROM words w '
       'LEFT JOIN categories c ON c.id=w.category_id '
-      + (q.isEmpty
+      '${q.isEmpty
           ? 'ORDER BY w.german COLLATE NOCASE ASC '
           : 'WHERE w.german LIKE ? OR w.translation LIKE ? '
-            'ORDER BY w.german COLLATE NOCASE ASC ') +
+            'ORDER BY w.german COLLATE NOCASE ASC '}'
       'LIMIT 500',
       q.isEmpty ? <Object?>[] : <Object?>['%$q%', '%$q%'],
     );
@@ -54,7 +54,7 @@ class WordRepository {
           await db.rawQuery(
             'SELECT COUNT(*) FROM words w '
             'INNER JOIN reviews r ON r.word_id=w.id '
-            'WHERE ' + filters.join(' AND '),
+            'WHERE ${filters.join(' AND ') }',
             args,
           ),
         ) ??
@@ -85,7 +85,7 @@ class WordRepository {
       'SELECT w.* '
       'FROM words w '
       'INNER JOIN reviews r ON r.word_id=w.id '
-      'WHERE ' + filters.join(' AND ') + ' '
+      'WHERE ${filters.join(' AND ') } '
       'ORDER BY COALESCE(r.due_at, "") ASC,w.id ASC '
       'LIMIT ?',
       args,
