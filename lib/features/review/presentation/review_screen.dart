@@ -488,19 +488,19 @@ class _ReviewScreenState extends State<ReviewScreen>
       );
     }
 
-    final horizontalProgress =
-        (_dragOffset.dx.abs() / 320).clamp(0.0, 1.0);
-    final verticalProgress =
-        (_dragOffset.dy / 220).clamp(0.0, 1.0);
+    final double horizontalProgress =
+        (_dragOffset.dx.abs() / 320).clamp(0.0, 1.0).toDouble();
+    final double verticalProgress =
+        (_dragOffset.dy / 220).clamp(0.0, 1.0).toDouble();
 
-    final scale = 1.0 - (horizontalProgress * 0.035);
+    final double scale = 1.0 - (horizontalProgress * 0.035);
     final rotation = _dragOffset.dx * 0.00075;
 
     final borderColor = _dragOffset.dx > 30
-        ? _green.withOpacity((_dragOffset.dx / 150).clamp(0.0, 1.0))
+        ? _green.withOpacity((_dragOffset.dx / 150).clamp(0.0, 1.0).toDouble())
         : _dragOffset.dx < -30
             ? _red.withOpacity(
-                (_dragOffset.dx.abs() / 150).clamp(0.0, 1.0),
+                (_dragOffset.dx.abs() / 150).clamp(0.0, 1.0).toDouble(),
               )
             : verticalProgress > 0.15
                 ? Colors.orange.withOpacity(verticalProgress)
@@ -620,8 +620,8 @@ class _ReviewScreenState extends State<ReviewScreen>
     final nextWord =
         _index + 1 < _queue.length ? _queue[_index + 1] : null;
 
-    final nextScale =
-        0.94 + ((_dragOffset.dx.abs() / 320).clamp(0.0, 1.0) * 0.04);
+    final double nextScale =
+        0.94 + ((_dragOffset.dx.abs() / 320).clamp(0.0, 1.0).toDouble() * 0.04);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -638,7 +638,7 @@ class _ReviewScreenState extends State<ReviewScreen>
               borderRadius: BorderRadius.circular(10),
               child: LinearProgressIndicator(
                 minHeight: 5,
-                value: ((_index + 1) / _queue.length).clamp(0.0, 1.0),
+                value: ((_index + 1) / _queue.length).clamp(0.0, 1.0).toDouble(),
                 backgroundColor: const Color(0xFFE5E7EF),
                 valueColor: const AlwaysStoppedAnimation(_primary),
               ),
@@ -655,8 +655,8 @@ class _ReviewScreenState extends State<ReviewScreen>
                 child: Center(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final cardHeight =
-                          constraints.maxHeight.clamp(420.0, 560.0);
+                      final double cardHeight =
+                          constraints.maxHeight.clamp(420.0, 560.0).toDouble();
 
                       return SizedBox(
                         height: cardHeight,
