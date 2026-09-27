@@ -8,6 +8,7 @@ import '../../exercises/presentation/exercise_screen.dart';
 import '../../discovery/presentation/discovery_screen.dart';
 import '../../export/presentation/export_words_screen.dart';
 import '../../import/presentation/import_words_screen.dart';
+import '../../reader/presentation/german_reader_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -310,6 +311,13 @@ class _HomeScreenState extends State<HomeScreen> {
               Icons.file_download_rounded,
               const Color(0xFFEFF0FF),
               () => _open(const ExportWordsScreen()),
+            ),
+            _action(
+              'القارئ الألماني',
+              'اقرأ أي نص ألماني واستمع إلى الجمل والكلمات',
+              Icons.record_voice_over_rounded,
+              const Color(0xFFEFF0FF),
+              () => _open(const GermanReaderScreen()),
             ),
             _action(
               'التمارين',
