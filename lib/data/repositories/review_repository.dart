@@ -1,5 +1,4 @@
 import 'package:sqflite/sqflite.dart';
-import '../../core/config/learning_config.dart';
 import '../../core/database/database_helper.dart';
 
 class ReviewRepository {
