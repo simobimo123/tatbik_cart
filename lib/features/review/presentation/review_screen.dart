@@ -95,10 +95,20 @@ class _ReviewScreenState extends State<ReviewScreen>
 
       if (_queue.isNotEmpty) {
         if (remembered && hasBeenAnsweredBefore) {
+          // إذا تذكّرها مرة ثانية: تنتقل إلى آخر الحزمة.
           _queue.add(word);
         } else {
-          final delay = remembered ? 10 : 30;
-          final insertAt = (_index + delay).clamp(0, _queue.length).toInt();
+          // أول "تذكّرتها" = البطاقة العاشرة.
+          // أول "لم أتذكر" = البطاقة الثلاثون.
+          //
+          // بعد حذف البطاقة الحالية، الفهرس 0 هو البطاقة التالية.
+          // لذلك نستخدم targetPosition - 1 حتى تكون البطاقة فعلاً
+          // رقم 10 أو 30، وليس 11 أو 31.
+          final targetPosition = remembered ? 10 : 30;
+          final insertAt = (targetPosition - 1)
+              .clamp(0, _queue.length)
+              .toInt();
+
           _queue.insert(insertAt, word);
         }
       }
