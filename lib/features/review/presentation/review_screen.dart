@@ -959,11 +959,11 @@ class _ReviewScreenState extends State<ReviewScreen>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               widget.categoryId != null || widget.difficulty != null
                   ? 'المراجعة المفلترة'
                   : 'المراجعة',
-              style: TextStyle(fontWeight: FontWeight.w800),
+              style: const TextStyle(fontWeight: FontWeight.w800),
             ),
             Text(
               'تمت الإجابة عن $_sessionAnswered بطاقة',
