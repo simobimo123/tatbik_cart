@@ -57,10 +57,16 @@ class WordImportRepository {
 
     var added = 0;
     var skipped = rawWords.length - items.length;
+    final importedKeys = <String>{};
 
     await db.transaction((txn) async {
       for (final item in items) {
         final key = item['german']!.toLowerCase();
+        if (!importedKeys.add(key)) {
+          skipped++;
+          continue;
+        }
+
         final existingId = idsByGerman[key];
 
         if (target == WordImportTarget.discovery) {
