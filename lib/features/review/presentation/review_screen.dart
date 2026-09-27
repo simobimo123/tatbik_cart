@@ -76,7 +76,14 @@ class _ReviewScreenState extends State<ReviewScreen>
     if (!mounted) return;
 
     setState(() {
-      _index++;
+      // Remove the reviewed card from the active queue.
+      // The next card automatically becomes the current card at the same index.
+      _queue.removeAt(_index);
+
+      if (_index >= _queue.length && _queue.isNotEmpty) {
+        _index = _queue.length - 1;
+      }
+
       _revealed = false;
       _dragOffset = Offset.zero;
       _isAnimating = false;
