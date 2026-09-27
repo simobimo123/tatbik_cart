@@ -46,7 +46,7 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
           _speakingKey = null;
         });
       });
-      _tts.setCancelHandler((_) {
+      _tts.setCancelHandler(() {
         if (!mounted) return;
         setState(() {
           _speaking = false;
