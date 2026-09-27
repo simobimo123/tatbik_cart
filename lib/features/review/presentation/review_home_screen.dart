@@ -69,52 +69,17 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
   }
 
   Future<void> _addCategory() async {
-    final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text(
-          'إضافة تصنيف جديد',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textDirection: TextDirection.rtl,
-          decoration: const InputDecoration(
-            labelText: 'اسم التصنيف',
-            hintText: 'مثال: التسوق',
-          ),
-          onSubmitted: (value) {
-            if (value.trim().isNotEmpty) {
-              Navigator.of(dialogContext).pop(value.trim());
-            }
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              if (value.isNotEmpty) {
-                Navigator.of(dialogContext).pop(value);
-              }
-            },
-            child: const Text('إضافة'),
-          ),
-        ],
-      ),
+      builder: (_) => const _AddCategoryDialog(),
     );
 
-    controller.dispose();
-    if (name == null || name.trim().isEmpty) return;
+    if (!mounted || name == null || name.trim().isEmpty) return;
 
     try {
       await _categories.create(name);
       if (!mounted) return;
+
       setState(_refresh);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم إنشاء التصنيف «${name.trim()}»')),
@@ -126,7 +91,6 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
       );
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -385,6 +349,68 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
         background: const Color(0xFFF0EFFF),
         onTap: () => _openSession(categoryId: category.id),
       ),
+    );
+  }
+}
+
+
+
+class _AddCategoryDialog extends StatefulWidget {
+  const _AddCategoryDialog();
+
+  @override
+  State<_AddCategoryDialog> createState() => _AddCategoryDialogState();
+}
+
+class _AddCategoryDialogState extends State<_AddCategoryDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    if (value.isEmpty) return;
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'إضافة تصنيف جديد',
+        style: TextStyle(fontWeight: FontWeight.w900),
+      ),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        textDirection: TextDirection.rtl,
+        textInputAction: TextInputAction.done,
+        decoration: const InputDecoration(
+          labelText: 'اسم التصنيف',
+          hintText: 'مثال: التسوق',
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('إضافة'),
+        ),
+      ],
     );
   }
 }
