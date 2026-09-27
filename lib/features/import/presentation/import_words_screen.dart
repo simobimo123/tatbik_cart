@@ -35,10 +35,10 @@ class _ImportWordsScreenState extends State<ImportWordsScreen> {
         builder: (context) => AlertDialog(
           title: const Text('اكتمل الاستيراد', style: TextStyle(fontWeight: FontWeight.w800)),
           content: Text(
-            'الملف: ' + file.name + '\n\n' +
-            'العناصر الصالحة: ' + result.total.toString() + '\n' +
-            'تمت إضافتها: ' + result.added.toString() + '\n' +
-            'تم تجاوزها: ' + result.skipped.toString(),
+            'الملف: $file.name\n\n'
+            'العناصر الصالحة: $result.total\n'
+            'تمت إضافتها: $result.added\n'
+            'تم تجاوزها: $result.skipped',
           ),
           actions: [
             FilledButton(
@@ -53,7 +53,10 @@ class _ImportWordsScreenState extends State<ImportWordsScreen> {
       await _showError('ملف غير صالح', e.message);
     } catch (e) {
       if (!mounted) return;
-      await _showError('تعذر الاستيراد', 'حدث خطأ أثناء قراءة الملف:\n\n' + e.toString());
+      await _showError(
+        'تعذر الاستيراد',
+        'حدث خطأ أثناء قراءة الملف:\n\n$e',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
