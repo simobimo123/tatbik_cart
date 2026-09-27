@@ -1,5 +1,4 @@
 import 'package:sqflite/sqflite.dart';
-import '../../core/config/learning_config.dart';
 import '../../core/database/database_helper.dart';
 import '../models/word_model.dart';
 
@@ -11,20 +10,18 @@ class DiscoveryRepository {
 
   Future<WordModel?> nextWord() async {
     final db = await _databaseHelper.database;
-    final step = await _currentStep(db);
 
     final rows = await db.rawQuery(
       'SELECT w.* '
       'FROM words w '
       'LEFT JOIN word_discoveries d ON d.word_id=w.id '
       'WHERE w.builtin=1 '
-      'AND (d.word_id IS NULL OR (d.known=1 AND d.due_step<=?)) '
+      'AND (d.word_id IS NULL OR d.known=1) '
       'ORDER BY '
-      'CASE WHEN d.known=1 THEN 0 ELSE 1 END, '
-      'COALESCE(d.due_step,0) ASC, '
+      'CASE WHEN d.word_id IS NULL THEN 0 ELSE 1 END ASC, '
+      'CASE WHEN d.word_id IS NULL THEN w.id ELSE d.discovery_order END ASC, '
       'w.id ASC '
       'LIMIT 1',
-      [step],
     );
 
     if (rows.isEmpty) return null;
@@ -47,7 +44,6 @@ class DiscoveryRepository {
 
   Future<int> availableCount() async {
     final db = await _databaseHelper.database;
-    final step = await _currentStep(db);
 
     return Sqflite.firstIntValue(
           await db.rawQuery(
@@ -55,16 +51,10 @@ class DiscoveryRepository {
             'FROM words w '
             'LEFT JOIN word_discoveries d ON d.word_id=w.id '
             'WHERE w.builtin=1 '
-            'AND (d.word_id IS NULL OR (d.known=1 AND d.due_step<=?))',
-            [step],
+            'AND (d.word_id IS NULL OR d.known=1)',
           ),
         ) ??
         0;
-  }
-
-  Future<int> currentStep() async {
-    final db = await _databaseHelper.database;
-    return _currentStep(db);
   }
 
   Future<void> answer(
@@ -74,22 +64,6 @@ class DiscoveryRepository {
     final db = await _databaseHelper.database;
 
     await db.transaction((txn) async {
-      final current = Sqflite.firstIntValue(
-            await txn.rawQuery(
-              'SELECT value FROM app_state WHERE key=?',
-              ['discovery_step'],
-            ),
-          ) ??
-          0;
-
-      final nextStep = current + 1;
-
-      await txn.insert(
-        'app_state',
-        {'key': 'discovery_step', 'value': nextStep},
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-
       final oldRows = await txn.query(
         'word_discoveries',
         columns: ['times_seen'],
@@ -100,23 +74,11 @@ class DiscoveryRepository {
 
       final oldTimesSeen =
           oldRows.isEmpty ? 0 : oldRows.first['times_seen'] as int;
+
       final timesSeen = oldTimesSeen + 1;
       final now = DateTime.now().toIso8601String();
 
-      if (known) {
-        await txn.insert(
-          'word_discoveries',
-          {
-            'word_id': word.id,
-            'known': 1,
-            'discovered_at': now,
-            'due_step':
-                nextStep + LearningConfig.discoveryKnownDelayCards,
-            'times_seen': timesSeen,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      } else {
+      if (!known) {
         await txn.insert(
           'word_discoveries',
           {
@@ -125,10 +87,12 @@ class DiscoveryRepository {
             'discovered_at': now,
             'due_step': 0,
             'times_seen': timesSeen,
+            'discovery_order': 0,
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
 
+        // الكلمة غير المعروفة تدخل المراجعة مباشرة.
         await txn.insert(
           'reviews',
           {
@@ -140,17 +104,32 @@ class DiscoveryRepository {
           },
           conflictAlgorithm: ConflictAlgorithm.ignore,
         );
-      }
-    });
-  }
 
-  Future<int> _currentStep(Database db) async {
-    return Sqflite.firstIntValue(
-          await db.rawQuery(
-            'SELECT value FROM app_state WHERE key=?',
-            ['discovery_step'],
-          ),
-        ) ??
-        0;
+        return;
+      }
+
+      // أعرفها = انقلها إلى آخر طابور الاكتشاف الحالي.
+      // كل الكلمات الجديدة/غير المكتشفة تبقى قبلها.
+      final maxOrder = Sqflite.firstIntValue(
+            await txn.rawQuery(
+              'SELECT COALESCE(MAX(discovery_order), 0) '
+              'FROM word_discoveries WHERE known=1',
+            ),
+          ) ??
+          0;
+
+      await txn.insert(
+        'word_discoveries',
+        {
+          'word_id': word.id,
+          'known': 1,
+          'discovered_at': now,
+          'due_step': 0,
+          'times_seen': timesSeen,
+          'discovery_order': maxOrder + 1,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
   }
 }
