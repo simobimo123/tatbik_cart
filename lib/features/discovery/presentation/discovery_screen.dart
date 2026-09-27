@@ -242,7 +242,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
                 transform: Matrix4.identity()
-                  ..translate(_dragDx, 0.0)
+                  ..translateByDouble(_dragDx, 0.0, 0.0, 1.0)
                   ..rotateZ(_dragDx * 0.00065),
                 transformAlignment: Alignment.center,
                 constraints: const BoxConstraints(minHeight: 465),
@@ -253,8 +253,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                   border: Border.all(
                     color: _isDragging
                         ? (isKnownDrag
-                            ? _green.withOpacity(0.5)
-                            : _red.withOpacity(0.5))
+                            ? _green.withValues(alpha: 0.5)
+                            : _red.withValues(alpha: 0.5))
                         : const Color(0xFFE8E9F2),
                     width: 2,
                   ),
@@ -394,8 +394,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: isKnownDrag
-                                ? _green.withOpacity(0.95)
-                                : _red.withOpacity(0.95),
+                                ? _green.withValues(alpha: 0.95)
+                                : _red.withValues(alpha: 0.95),
                             borderRadius: BorderRadius.circular(15),
                           ),
                           child: Text(
