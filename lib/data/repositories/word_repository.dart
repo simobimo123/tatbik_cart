@@ -3,12 +3,15 @@ import '../../core/database/database_helper.dart';
 import '../models/word_model.dart';
 
 class WordRepository {
-  WordRepository({DatabaseHelper? databaseHelper}) : _databaseHelper = databaseHelper ?? DatabaseHelper.instance;
+  WordRepository({DatabaseHelper? databaseHelper})
+      : _databaseHelper = databaseHelper ?? DatabaseHelper.instance;
+
   final DatabaseHelper _databaseHelper;
 
   Future<List<WordModel>> getWords([String query = '']) async {
     final db = await _databaseHelper.database;
     final q = query.trim();
+
     final rows = await db.query(
       'words',
       where: q.isEmpty ? null : 'german LIKE ? OR translation LIKE ?',
@@ -16,20 +19,26 @@ class WordRepository {
       orderBy: 'german COLLATE NOCASE ASC',
       limit: 500,
     );
+
     return rows.map(WordModel.fromMap).toList();
   }
 
   Future<int> count() async {
     final db = await _databaseHelper.database;
-    return Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM words')) ?? 0;
+    return Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM words'),
+        ) ??
+        0;
   }
 
   Future<int> dueCount() async {
     final db = await _databaseHelper.database;
     final now = DateTime.now().toIso8601String();
+
     return Sqflite.firstIntValue(
           await db.rawQuery(
-            'SELECT COUNT(*) FROM words w '
+            'SELECT COUNT(*) '
+            'FROM words w '
             'INNER JOIN reviews r ON r.word_id=w.id '
             'WHERE r.due_at IS NULL OR r.due_at<=?',
             [now],
@@ -38,23 +47,28 @@ class WordRepository {
         0;
   }
 
-  Future<List<WordModel>> dueWords() async {
+  Future<List<WordModel>> dueWords({int limit = 300}) async {
     final db = await _databaseHelper.database;
     final now = DateTime.now().toIso8601String();
+
     final rows = await db.rawQuery(
-      'SELECT w.* FROM words w '
+      'SELECT w.* '
+      'FROM words w '
       'INNER JOIN reviews r ON r.word_id=w.id '
       'WHERE r.due_at IS NULL OR r.due_at<=? '
-      'ORDER BY COALESCE(r.due_at, "") ASC,w.id ASC LIMIT 100',
-      [now],
+      'ORDER BY COALESCE(r.due_at, "") ASC,w.id ASC '
+      'LIMIT ?',
+      [now, limit],
     );
+
     return rows.map(WordModel.fromMap).toList();
   }
 
-  Future<void> add({
+  Future<void> addToReview({
     required String german,
     required String translation,
     required String example,
+    required String exampleTranslation,
   }) async {
     final db = await _databaseHelper.database;
     final now = DateTime.now().toIso8601String();
@@ -64,11 +78,11 @@ class WordRepository {
         'german': german.trim(),
         'translation': translation.trim(),
         'example': example.trim(),
+        'example_translation': exampleTranslation.trim(),
         'builtin': 0,
         'created_at': now,
       });
 
-      // الكلمات التي يضيفها المستخدم يدويًا تدخل المراجعة مباشرة.
       await txn.insert('reviews', {
         'word_id': wordId,
         'interval_days': 0,
@@ -79,9 +93,38 @@ class WordRepository {
     });
   }
 
+  Future<List<WordModel>> reviewWords() async {
+    final db = await _databaseHelper.database;
+
+    final rows = await db.rawQuery(
+      'SELECT w.* '
+      'FROM words w '
+      'INNER JOIN reviews r ON r.word_id=w.id '
+      'ORDER BY w.german COLLATE NOCASE ASC,w.id ASC',
+    );
+
+    return rows.map(WordModel.fromMap).toList();
+  }
+
   Future<void> remove(int id) async {
     final db = await _databaseHelper.database;
-    await db.delete('reviews', where: 'word_id=?', whereArgs: [id]);
-    await db.delete('words', where: 'id=?', whereArgs: [id]);
+
+    await db.transaction((txn) async {
+      await txn.delete(
+        'reviews',
+        where: 'word_id=?',
+        whereArgs: [id],
+      );
+      await txn.delete(
+        'word_discoveries',
+        where: 'word_id=?',
+        whereArgs: [id],
+      );
+      await txn.delete(
+        'words',
+        where: 'id=?',
+        whereArgs: [id],
+      );
+    });
   }
 }
