@@ -12,12 +12,16 @@ class WordRepository {
     final db = await _databaseHelper.database;
     final q = query.trim();
 
-    final rows = await db.query(
-      'words',
-      where: q.isEmpty ? null : 'german LIKE ? OR translation LIKE ?',
-      whereArgs: q.isEmpty ? null : ['%$q%', '%$q%'],
-      orderBy: 'german COLLATE NOCASE ASC',
-      limit: 500,
+    final rows = await db.rawQuery(
+      'SELECT w.*, c.name AS category_name '
+      'FROM words w '
+      'LEFT JOIN categories c ON c.id=w.category_id '
+      + (q.isEmpty
+          ? 'ORDER BY w.german COLLATE NOCASE ASC '
+          : 'WHERE w.german LIKE ? OR w.translation LIKE ? '
+            'ORDER BY w.german COLLATE NOCASE ASC ') +
+      'LIMIT 500',
+      q.isEmpty ? <Object?>[] : <Object?>['%$q%', '%$q%'],
     );
 
     return rows.map(WordModel.fromMap).toList();
