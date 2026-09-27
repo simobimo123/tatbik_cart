@@ -48,13 +48,35 @@ class CategoryRepository {
 
   Future<void> delete(int id) async {
     final db = await _databaseHelper.database;
+
     await db.transaction((txn) async {
-      await txn.update(
+      final words = await txn.query(
         'words',
-        {'category_id': null},
+        columns: ['id'],
         where: 'category_id=?',
         whereArgs: [id],
       );
+
+      for (final row in words) {
+        final wordId = row['id'] as int;
+
+        await txn.delete(
+          'reviews',
+          where: 'word_id=?',
+          whereArgs: [wordId],
+        );
+        await txn.delete(
+          'word_discoveries',
+          where: 'word_id=?',
+          whereArgs: [wordId],
+        );
+        await txn.delete(
+          'words',
+          where: 'id=?',
+          whereArgs: [wordId],
+        );
+      }
+
       await txn.delete(
         'categories',
         where: 'id=?',
