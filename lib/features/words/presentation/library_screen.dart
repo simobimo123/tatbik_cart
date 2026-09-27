@@ -44,6 +44,24 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
+  Widget _badge(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F1F7),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.black54,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -146,6 +164,24 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                           color: Color(0xFF5B5FEF),
                                           fontWeight: FontWeight.w700,
                                         ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        children: [
+                                          if (word.difficulty != 'unspecified')
+                                            _badge(
+                                              word.difficulty == 'easy'
+                                                  ? 'سهل'
+                                                  : word.difficulty == 'medium'
+                                                      ? 'متوسط'
+                                                      : 'صعب',
+                                            ),
+                                          if (word.categoryName != null &&
+                                              word.categoryName!.isNotEmpty)
+                                            _badge(word.categoryName!),
+                                        ],
                                       ),
                                       const SizedBox(height: 7),
                                       Text(
