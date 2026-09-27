@@ -37,7 +37,7 @@ class WordRepository {
     final db = await _databaseHelper.database;
     final now = DateTime.now().toIso8601String();
     final rows = await db.rawQuery(
-      'SELECT w.* FROM words w LEFT JOIN reviews r ON r.word_id=w.id WHERE r.word_id IS NULL OR r.due_at IS NULL OR r.due_at<=? ORDER BY COALESCE(r.due_at, "") ASC,w.id ASC LIMIT 30',
+      'SELECT w.* FROM words w LEFT JOIN reviews r ON r.word_id=w.id WHERE r.word_id IS NULL OR r.due_at IS NULL OR r.due_at<=? ORDER BY COALESCE(r.due_at, "") ASC,w.id ASC LIMIT 100',
       [now],
     );
     return rows.map(WordModel.fromMap).toList();
