@@ -236,6 +236,10 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
             ),
             const SizedBox(height: 18),
             GestureDetector(
+              onDoubleTap: () {
+                if (_busy || _word == null) return;
+                setState(() => _showMeaning = true);
+              },
               onPanUpdate: _handleDragUpdate,
               onPanEnd: _handleDragEnd,
               child: AnimatedContainer(
@@ -367,7 +371,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                     ] else ...[
                       const SizedBox(height: 8),
                       const Text(
-                        'اسحب يمينًا إذا كنت تعرفها',
+                        'اضغط مرتين لعرض الترجمة والتأكد من الكلمة',
                         style: TextStyle(
                           color: Colors.black45,
                           fontSize: 14,
@@ -375,7 +379,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'اسحب يسارًا إذا لم تكن تعرفها',
+                        'ثم اختر «أعرفها» أو «لا أعرفها»',
                         style: TextStyle(
                           color: Colors.black45,
                           fontSize: 14,
