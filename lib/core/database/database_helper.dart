@@ -16,7 +16,7 @@ class DatabaseHelper {
 
     _database = await openDatabase(
       path.join(directory, 'deutsch_lernen.db'),
-      version: 3,
+      version: 4,
       onCreate: (db, version) => _createTables(db),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -62,6 +62,35 @@ class DatabaseHelper {
             conflictAlgorithm: ConflictAlgorithm.ignore,
           );
         }
+
+        if (oldVersion < 4) {
+          await db.execute(
+            "ALTER TABLE word_discoveries ADD COLUMN discovery_order INTEGER NOT NULL DEFAULT 0",
+          );
+          await db.execute(
+            'CREATE INDEX word_discoveries_queue '
+            'ON word_discoveries(known, discovery_order)',
+          );
+
+          // ترتيب الكلمات المعروفة الموجودة سابقًا يحافظ على ترتيب اكتشافها.
+          final knownRows = await db.query(
+            'word_discoveries',
+            columns: ['word_id'],
+            where: 'known=1',
+            orderBy: 'discovered_at ASC, word_id ASC',
+          );
+
+          var order = 0;
+          for (final row in knownRows) {
+            order++;
+            await db.update(
+              'word_discoveries',
+              {'discovery_order': order},
+              where: 'word_id=?',
+              whereArgs: [row['word_id']],
+            );
+          }
+        }
       },
     );
 
@@ -98,7 +127,8 @@ class DatabaseHelper {
       'known INTEGER NOT NULL, '
       'discovered_at TEXT NOT NULL, '
       'due_step INTEGER NOT NULL DEFAULT 0, '
-      'times_seen INTEGER NOT NULL DEFAULT 0'
+      'times_seen INTEGER NOT NULL DEFAULT 0, '
+      'discovery_order INTEGER NOT NULL DEFAULT 0'
       ')',
     );
 
@@ -109,15 +139,10 @@ class DatabaseHelper {
       ')',
     );
 
-    await db.insert(
-      'app_state',
-      {'key': 'discovery_step', 'value': 0},
-    );
-
     await db.execute('CREATE INDEX words_german ON words(german)');
     await db.execute(
-      'CREATE INDEX word_discoveries_due '
-      'ON word_discoveries(known, due_step)',
+      'CREATE INDEX word_discoveries_queue '
+      'ON word_discoveries(known, discovery_order)',
     );
   }
 
