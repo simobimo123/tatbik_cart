@@ -186,8 +186,8 @@ class _ReviewScreenState extends State<ReviewScreen>
       // Keep the gesture bounded so the card stays visually connected
       // to the finger while still allowing a strong swipe.
       _dragOffset = Offset(
-        _dragOffset.dx.clamp(-360.0, 360.0),
-        _dragOffset.dy.clamp(-90.0, 260.0),
+        _dragOffset.dx.clamp(-280.0, 280.0),
+        _dragOffset.dy.clamp(-70.0, 220.0),
       );
     });
   }
@@ -200,9 +200,9 @@ class _ReviewScreenState extends State<ReviewScreen>
     final verticalDistance = _dragOffset.dy;
 
     if (!_revealed &&
-        horizontalDistance < 12 &&
-        verticalDistance.abs() < 12 &&
-        velocity.abs() < 70) {
+        horizontalDistance < 24 &&
+        verticalDistance.abs() < 24 &&
+        velocity.abs() < 120) {
       setState(() => _revealed = true);
       return;
     }
@@ -212,14 +212,14 @@ class _ReviewScreenState extends State<ReviewScreen>
     // slow/diagonal gestures from being treated as an answer.
     final horizontalVelocity = velocity;
 
-    if (_dragOffset.dx > 150 ||
-        (_dragOffset.dx > 80 && horizontalVelocity > 1100)) {
+    if (_dragOffset.dx > 190 ||
+        (_dragOffset.dx > 135 && horizontalVelocity > 1400)) {
       _answer(true);
-    } else if (_dragOffset.dx < -150 ||
-        (_dragOffset.dx < -80 && horizontalVelocity < -1100)) {
+    } else if (_dragOffset.dx < -190 ||
+        (_dragOffset.dx < -135 && horizontalVelocity < -1400)) {
       _answer(false);
-    } else if (_dragOffset.dy > 175 &&
-        _dragOffset.dy > _dragOffset.dx.abs() * 0.85) {
+    } else if (_dragOffset.dy > 210 &&
+        _dragOffset.dy > _dragOffset.dx.abs() * 0.95) {
       _delete();
     } else {
       _returnCardToCenter();
