@@ -9,13 +9,13 @@ class DiscoveryScreen extends StatefulWidget {
   State<DiscoveryScreen> createState() => _DiscoveryScreenState();
 }
 
-class _DiscoveryScreenState extends State<DiscoveryScreen>
-    with SingleTickerProviderStateMixin {
+class _DiscoveryScreenState extends State<DiscoveryScreen> {
   final _repository = DiscoveryRepository();
 
   WordModel? _word;
-  int _total = 0;
-  int _remaining = 0;
+  int _available = 0;
+  int _step = 0;
+
   bool _loading = true;
   bool _busy = false;
   bool _showMeaning = false;
@@ -30,29 +30,25 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
   @override
   void initState() {
     super.initState();
-    _loadNext(firstLoad: true);
+    _load();
   }
 
-  Future<void> _loadNext({bool firstLoad = false}) async {
-    if (firstLoad) {
-      setState(() {
-        _loading = true;
-        _showMeaning = false;
-      });
-    }
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _showMeaning = false;
+    });
 
-    final words = await _repository.getPendingWords();
-    final count = await _repository.pendingCount();
+    final word = await _repository.nextWord();
+    final available = await _repository.availableCount();
+    final step = await _repository.currentStep();
 
     if (!mounted) return;
 
     setState(() {
-      if (firstLoad) {
-        _total = count;
-      }
-
-      _word = words.isEmpty ? null : words.first;
-      _remaining = count;
+      _word = word;
+      _available = available;
+      _step = step;
       _loading = false;
       _busy = false;
       _showMeaning = false;
@@ -79,7 +75,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
     );
 
     if (!mounted) return;
-    await _loadNext();
+    await _load();
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
@@ -139,7 +135,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
               ),
               const SizedBox(height: 22),
               const Text(
-                'لا توجد كلمات جديدة',
+                'لا توجد كلمات متاحة الآن',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 23,
@@ -148,7 +144,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
               ),
               const SizedBox(height: 9),
               const Text(
-                'أضف كلماتك إلى قاعدة الكلمات الخاصة بالتطبيق، وستظهر هنا تلقائيًا.',
+                'أضف كلمات جديدة إلى ملف قاعدة الكلمات، وستظهر تلقائيًا في الاكتشاف.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.black54,
@@ -167,7 +163,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('اكتشاف الكلمات')),
+        appBar: AppBar(
+          title: const Text('اكتشاف الكلمات'),
+        ),
         body: const Center(
           child: CircularProgressIndicator(),
         ),
@@ -178,11 +176,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
     if (word == null) {
       return _buildEmptyState();
     }
-
-    final processed = (_total - _remaining).clamp(0, _total);
-    final progress = _total == 0
-        ? 0.0
-        : (processed / _total).clamp(0.0, 1.0).toDouble();
 
     final dragProgress = (_dragDx.abs() / 160).clamp(0.0, 1.0);
     final isKnownDrag = _dragDx > 0;
@@ -202,7 +195,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
               borderRadius: BorderRadius.circular(10),
               child: LinearProgressIndicator(
                 minHeight: 5,
-                value: progress,
+                value: (dragProgress * 0.0),
                 backgroundColor: const Color(0xFFE5E7EF),
                 valueColor: const AlwaysStoppedAnimation(_primary),
               ),
@@ -220,16 +213,17 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'هل تعرف هذه الكلمة؟',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w900,
-                            ),
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'قرر قبل أن ترى معناها.',
-                        style: TextStyle(
+                      Text(
+                        'تم اكتشاف $_step كلمة / قرار حتى الآن',
+                        style: const TextStyle(
                           color: Colors.black54,
                           fontSize: 13,
                         ),
@@ -250,7 +244,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
                     ),
                   ),
                   child: Text(
-                    '$_remaining متبقية',
+                    '$_available متاحة',
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 12,
@@ -373,6 +367,19 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
                                 fontSize: 13,
                               ),
                             ),
+                            if (word.exampleTranslation.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                word.exampleTranslation,
+                                textDirection: TextDirection.rtl,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  height: 1.45,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -458,7 +465,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
             ),
             const SizedBox(height: 11),
             const Text(
-              'النقر على «لا أعرفها» يضيف الكلمة مباشرة إلى المراجعة.',
+              '«أعرفها» تؤجل الكلمة 1000 بطاقة. «لا أعرفها» تنقلها مباشرة إلى المراجعة.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.black45,
