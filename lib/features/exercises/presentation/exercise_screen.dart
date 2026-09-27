@@ -368,7 +368,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '$_words.length كلمة • $_typeName(q.type)',
+                  '${_words.length} كلمة • ${_typeName(q.type)}',
                   style: const TextStyle(
                     color: Color(0xFFEDEEFF),
                     fontSize: 12.5,
