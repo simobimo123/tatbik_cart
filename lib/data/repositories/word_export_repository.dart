@@ -13,13 +13,16 @@ class WordExportRepository {
 
     final rows = reviewOnly
         ? await db.rawQuery(
-            'SELECT w.* '
+            'SELECT w.*, c.name AS category_name '
             'FROM words w INNER JOIN reviews r ON r.word_id=w.id '
+            'LEFT JOIN categories c ON c.id=w.category_id '
             'ORDER BY w.german COLLATE NOCASE ASC,w.id ASC',
           )
-        : await db.query(
-            'words',
-            orderBy: 'german COLLATE NOCASE ASC,id ASC',
+        : await db.rawQuery(
+            'SELECT w.*, c.name AS category_name '
+            'FROM words w '
+            'LEFT JOIN categories c ON c.id=w.category_id '
+            'ORDER BY w.german COLLATE NOCASE ASC,w.id ASC',
           );
 
     return rows.map(WordModel.fromMap).toList();
@@ -41,6 +44,9 @@ class WordExportRepository {
               'translation': word.translation,
               'example': word.example,
               'example_translation': word.exampleTranslation,
+              'difficulty': word.difficulty,
+              if (word.categoryName != null && word.categoryName!.isNotEmpty)
+                'category': word.categoryName,
             },
           )
           .toList(),
