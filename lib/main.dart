@@ -95,7 +95,7 @@ class LocalStore {
     final ease=(m?['ease'] as num?)?.toDouble() ?? 2.5;
     final nextReps=remembered?repetitions+1:0;
     final previousInterval=m?['interval_days'] as int? ?? 30;
-    final days=remembered?(nextReps==1?1:nextReps==2?3:nextReps==3?7:nextReps==4?14:nextReps==5?30:(previousInterval*ease).round().clamp(30,365)):0;
+    final days=remembered?(nextReps==1?1:nextReps==2?3:nextReps==3?7:nextReps==4?14:nextReps==5?30:(previousInterval*ease).round().clamp(30,365).toInt()):0;
     final nextEase=remembered?(ease+0.05).clamp(1.3,3.0):(ease-0.15).clamp(1.3,3.0);
     await db.insert('reviews',{'word_id':id,'interval_days':days,'ease':nextEase,'repetitions':nextReps,
       'due_at':DateTime.now().add(remembered?Duration(days:days):const Duration(minutes:10)).toIso8601String()},
