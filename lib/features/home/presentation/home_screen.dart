@@ -281,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'راجع الكلمات المستحقة وفق نظام التكرار',
               Icons.school_rounded,
               const Color(0xFFE9F9F5),
-              () => _open(const ReviewScreen()),
+              () => _open(const ReviewHomeScreen()),
             ),
             _action(
               'إضافة إلى المراجعة',
