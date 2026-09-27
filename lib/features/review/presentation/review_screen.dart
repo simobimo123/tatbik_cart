@@ -4,7 +4,7 @@ import '../../../core/config/learning_config.dart';
 import '../../../data/models/word_model.dart';
 import '../../../data/repositories/review_repository.dart';
 import '../../../data/repositories/word_repository.dart';
-import '../presentation/add_review_word_screen.dart';
+import 'add_review_word_screen.dart';
 import '../../export/presentation/export_words_screen.dart';
 
 class ReviewScreen extends StatefulWidget {
@@ -183,8 +183,10 @@ class _ReviewScreenState extends State<ReviewScreen>
       final dueStep = _sessionReturnAtStep[word.id];
 
       if (dueStep == null) {
-        firstAvailableIndex = i;
-        break;
+        if (firstAvailableIndex < 0) {
+          firstAvailableIndex = i;
+        }
+        continue;
       }
 
       if (dueStep <= _sessionStep && dueStep < bestDueStep) {
@@ -209,8 +211,10 @@ class _ReviewScreenState extends State<ReviewScreen>
       final dueStep = _sessionReturnAtStep[_queue[i].id];
 
       if (dueStep == null) {
-        firstAvailable = i;
-        break;
+        if (firstAvailable < 0) {
+          firstAvailable = i;
+        }
+        continue;
       }
 
       if (dueStep <= _sessionStep) {
