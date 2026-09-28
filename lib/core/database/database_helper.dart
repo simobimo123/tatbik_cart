@@ -114,9 +114,19 @@ class DatabaseHelper {
           }
         }
         if (oldVersion < 6) {
-          await db.execute(
-            "ALTER TABLE categories ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'unspecified'",
+          final categoryColumns = await db.rawQuery(
+            'PRAGMA table_info(categories)',
           );
+          final hasCategoryDifficulty = categoryColumns.any(
+            (column) => column['name'] == 'difficulty',
+          );
+
+          if (!hasCategoryDifficulty) {
+            await db.execute(
+              "ALTER TABLE categories ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'unspecified'",
+            );
+          }
+
           await db.execute(
             'CREATE INDEX IF NOT EXISTS categories_difficulty ON categories(difficulty)',
           );
