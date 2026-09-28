@@ -8,44 +8,113 @@ class DiscoveryRepository {
 
   final DatabaseHelper _databaseHelper;
 
-  Future<WordModel?> nextWord() async {
+  Future<WordModel?> nextWord({
+    int? categoryId,
+    String? difficulty,
+  }) async {
     final db = await _databaseHelper.database;
+
+    final filters = <String>[
+      'w.builtin=1',
+      'r.word_id IS NULL',
+      '(d.word_id IS NULL OR d.known=1)',
+    ];
+    final args = <Object?>[];
+
+    if (categoryId != null) {
+      filters.add('w.category_id=?');
+      args.add(categoryId);
+    }
+
+    if (difficulty != null) {
+      if (difficulty == 'unspecified') {
+        filters.add("COALESCE(w.difficulty, 'unspecified')='unspecified'");
+      } else {
+        filters.add('w.difficulty=?');
+        args.add(difficulty);
+      }
+    }
 
     final rows = await db.rawQuery(
       'SELECT w.* '
       'FROM words w '
       'LEFT JOIN word_discoveries d ON d.word_id=w.id '
       'LEFT JOIN reviews r ON r.word_id=w.id '
-      'WHERE w.builtin=1 '
-      'AND r.word_id IS NULL '
-      'AND (d.word_id IS NULL OR d.known=1) '
+      'WHERE ' + filters.join(' AND ') + ' '
       'ORDER BY '
       'CASE WHEN d.word_id IS NULL THEN 0 ELSE 1 END ASC, '
       'CASE WHEN d.word_id IS NULL THEN w.id ELSE d.discovery_order END ASC, '
       'w.id ASC '
       'LIMIT 1',
+      args,
     );
 
     if (rows.isEmpty) return null;
     return WordModel.fromMap(rows.first);
   }
-
-  Future<int> newWordCount() async {
+  Future<int> newWordCount({
+    int? categoryId,
+    String? difficulty,
+  }) async {
     final db = await _databaseHelper.database;
+
+    final filters = <String>[
+      'w.builtin=1',
+      'd.word_id IS NULL',
+    ];
+    final args = <Object?>[];
+
+    if (categoryId != null) {
+      filters.add('w.category_id=?');
+      args.add(categoryId);
+    }
+
+    if (difficulty != null) {
+      if (difficulty == 'unspecified') {
+        filters.add("COALESCE(w.difficulty, 'unspecified')='unspecified'");
+      } else {
+        filters.add('w.difficulty=?');
+        args.add(difficulty);
+      }
+    }
 
     return Sqflite.firstIntValue(
           await db.rawQuery(
             'SELECT COUNT(*) '
             'FROM words w '
             'LEFT JOIN word_discoveries d ON d.word_id=w.id '
-            'WHERE w.builtin=1 AND d.word_id IS NULL',
+            'WHERE ' + filters.join(' AND '),
+            args,
           ),
         ) ??
         0;
   }
-
-  Future<int> availableCount() async {
+  Future<int> availableCount({
+    int? categoryId,
+    String? difficulty,
+  }) async {
     final db = await _databaseHelper.database;
+
+    final filters = <String>[
+      'w.builtin=1',
+      'r.word_id IS NULL',
+      '(d.word_id IS NULL OR d.known=1)',
+    ];
+    final args = <Object?>[];
+
+    if (categoryId != null) {
+      filters.add('w.category_id=?');
+      args.add(categoryId);
+    }
+
+    if (difficulty != null) {
+      if (difficulty == 'unspecified') {
+        filters.add("COALESCE(w.difficulty, 'unspecified')='unspecified'");
+      } else {
+        filters.add('w.difficulty=?');
+        args.add(difficulty);
+      }
+    }
 
     return Sqflite.firstIntValue(
           await db.rawQuery(
@@ -53,14 +122,12 @@ class DiscoveryRepository {
             'FROM words w '
             'LEFT JOIN word_discoveries d ON d.word_id=w.id '
             'LEFT JOIN reviews r ON r.word_id=w.id '
-            'WHERE w.builtin=1 '
-            'AND r.word_id IS NULL '
-            'AND (d.word_id IS NULL OR d.known=1)',
+            'WHERE ' + filters.join(' AND '),
+            args,
           ),
         ) ??
         0;
   }
-
   Future<void> answer(
     WordModel word, {
     required bool known,
