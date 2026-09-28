@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 class SpeechService {
@@ -11,11 +12,8 @@ class SpeechService {
   bool _ready = false;
   String? _lastAutomaticKey;
 
-  String? get activeKey => _activeKey;
-  bool get isSpeaking => _isSpeaking;
-
-  String? _activeKey;
-  bool _isSpeaking = false;
+  final ValueNotifier<String?> activeKey = ValueNotifier<String?>(null);
+  final ValueNotifier<bool> speaking = ValueNotifier<bool>(false);
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -30,12 +28,12 @@ class SpeechService {
       await _tts.awaitSpeakCompletion(true);
 
       _tts.setStartHandler(() {
-        _isSpeaking = true;
+        speaking.value = true;
       });
 
       _tts.setCompletionHandler(() {
-        _isSpeaking = false;
-        _activeKey = null;
+        speaking.value = false;
+        activeKey.value = null;
       });
 
       _tts.setCancelHandler(() {
@@ -113,7 +111,7 @@ class SpeechService {
     try {
       await _tts.stop();
 
-      _activeKey = activeKey;
+      activeKey.value = activeKey;
       _isSpeaking = true;
 
       final result = await _tts.speak(value);
