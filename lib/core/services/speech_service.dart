@@ -112,7 +112,7 @@ class SpeechService {
       await _tts.stop();
 
       activeKey.value = activeKey;
-      _isSpeaking = true;
+      speaking.value = true;
 
       final result = await _tts.speak(value);
 
@@ -133,7 +133,7 @@ class SpeechService {
       // Ignore platform-specific stop errors.
     }
 
-    _isSpeaking = false;
-    _activeKey = null;
+    speaking.value = false;
+    activeKey.value = null;
   }
 }
