@@ -762,19 +762,22 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _buildMatchingTranslations(q)),
-              const SizedBox(width: 10),
-              Container(
-                width: 1,
-                height: 260,
-                color: const Color(0xFFE6E7F0),
-              ),
-              const SizedBox(width: 10),
-              Expanded(child: _buildMatchingAudio(q)),
-            ],
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildMatchingTranslations(q)),
+                const SizedBox(width: 10),
+                Container(
+                  width: 1,
+                  height: 260,
+                  color: const Color(0xFFE6E7F0),
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: _buildMatchingAudio(q)),
+              ],
+            ),
           ),
         ],
       ),
