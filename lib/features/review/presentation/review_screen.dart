@@ -305,7 +305,7 @@ class _ReviewScreenState extends State<ReviewScreen>
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: LinearProgressIndicator(
-                          value: progress.clamp(0.0, 1.0),
+                          value: progress.clamp(0.0, 1.0).toDouble(),
                           minHeight: 6,
                         ),
                       ),
@@ -691,8 +691,8 @@ class _ReviewScreenState extends State<ReviewScreen>
     setState(() {
       _dragOffset += details.delta;
       _dragOffset = Offset(
-        _dragOffset.dx.clamp(-280.0, 280.0),
-        _dragOffset.dy.clamp(-70.0, 220.0),
+        _dragOffset.dx.clamp(-280.0, 280.0).toDouble(),
+        _dragOffset.dy.clamp(-70.0, 220.0).toDouble(),
       );
     });
   }
