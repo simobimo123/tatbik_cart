@@ -156,12 +156,17 @@ class SpeechRecognitionService {
       _startingTaskFuture = startFuture;
       final task = await startFuture;
 
-      if (!identical(_startingTaskFuture, startFuture) || _stopRequested) {
+      if (!identical(_startingTaskFuture, startFuture)) {
         try {
           await task.cancel();
         } catch (_) {}
         return;
       }
+
+      // إذا طُلب الإيقاف أثناء تهيئة المهمة، يترك start المهمة
+      // لـ stopListening() أو cancelListening() ليتم التعامل معها
+      // مرة واحدة فقط.
+      if (_stopRequested) return;
 
       _streamTask = task;
       _updatesSubscription = task.updates.listen(
