@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/speech_service.dart';
 import '../../../data/models/word_model.dart';
 import '../../../data/repositories/discovery_repository.dart';
 
@@ -11,6 +12,7 @@ class DiscoveryScreen extends StatefulWidget {
 
 class _DiscoveryScreenState extends State<DiscoveryScreen> {
   final _repository = DiscoveryRepository();
+  final _speech = SpeechService.instance;
 
   WordModel? _word;
   int _available = 0;
@@ -18,6 +20,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   bool _busy = false;
   bool _showMeaning = false;
   bool _isDragging = false;
+  int _displayGeneration = 0;
 
   double _dragDx = 0;
 
@@ -28,7 +31,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   @override
   void initState() {
     super.initState();
+    _speech.initialize();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _speech.stop();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -49,7 +59,20 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       _showMeaning = false;
       _dragDx = 0;
       _isDragging = false;
+      _displayGeneration++;
     });
+
+    if (word != null) {
+      final automaticKey = 'discovery-$_displayGeneration-${word.id}';
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _busy) return;
+        _speech.speakGerman(
+          word.german,
+          activeKey: 'discovery-word-${word.id}',
+          automaticKey: automaticKey,
+        );
+      });
+    }
   }
 
   Future<void> _answer(bool known) async {
@@ -97,6 +120,39 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         _isDragging = false;
       });
     }
+  }
+
+  Widget _buildSpeaker(WordModel word) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: _speech.activeKey,
+      builder: (context, activeKey, _) {
+        final active = activeKey == 'discovery-word-${word.id}';
+
+        return Material(
+          color: active
+              ? const Color(0xFFE9E8FF)
+              : const Color(0xFFF0F1F7),
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: () => _speech.speakGerman(
+              word.german,
+              activeKey: 'discovery-word-${word.id}',
+            ),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(11),
+              child: Icon(
+                active
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_up_outlined,
+                color: _primary,
+                size: 24,
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildEmptyState() {
@@ -302,14 +358,23 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      word.german,
-                      textDirection: TextDirection.ltr,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.7,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            word.german,
+                            textDirection: TextDirection.ltr,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.7,
+                                ),
                           ),
+                        ),
+                        const SizedBox(width: 11),
+                        _buildSpeaker(word),
+                      ],
                     ),
                     const SizedBox(height: 13),
                     if (_showMeaning) ...[
