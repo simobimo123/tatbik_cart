@@ -46,9 +46,12 @@ class ExerciseScreen extends StatefulWidget {
 }
 
 class _ExerciseScreenState extends State<ExerciseScreen> {
+  static int _speechSessionCounter = 0;
+
   final _repository = WordRepository();
   final _random = Random();
   final _speech = SpeechService.instance;
+  final int _speechSessionId = ++_speechSessionCounter;
 
   List<WordModel> _words = [];
   _Question? _currentQuestion;
@@ -360,7 +363,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       _speech.speakGerman(
         content!,
         activeKey: key,
-        automaticKey: 'exercise-question-$generation',
+        automaticKey: 'exercise-question-$_speechSessionId-$generation',
       );
     });
   }
@@ -386,7 +389,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       _speech.speakGerman(
         content,
         activeKey: key,
-        automaticKey: 'exercise-feedback-$generation',
+        automaticKey: 'exercise-feedback-$_speechSessionId-$generation',
       );
     });
   }
