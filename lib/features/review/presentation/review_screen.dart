@@ -62,6 +62,10 @@ class _ReviewScreenState extends State<ReviewScreen>
     );
 
     _speech.initialize();
+
+    // نجهّز Whisper مسبقًا حتى لا ينتظر المستخدم تهيئة النموذج عند أول ضغطة.
+    unawaited(_voiceRecognition.prepare());
+
     _load(resetSession: true);
   }
 
@@ -118,13 +122,15 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
 
-  Future<void> _startOrStopVoiceAnswer(WordModel word) async {
-    if (_isAnimating || _voiceFinishing) return;
-
-    if (_voiceRecognition.isRecording) {
-      await _finishVoiceAnswer(word);
+  Future<void> _beginVoiceAnswer(WordModel word) async {
+    if (_isAnimating ||
+        _voiceFinishing ||
+        _voiceRecognition.state.value == SpeechRecognitionState.preparing ||
+        _voiceRecognition.state.value == SpeechRecognitionState.processing) {
       return;
     }
+
+    if (_voiceRecognition.isRecording) return;
 
     await _speech.stop();
     _voiceTimer?.cancel();
@@ -142,10 +148,11 @@ class _ReviewScreenState extends State<ReviewScreen>
       );
 
       if (!mounted) return;
-
       setState(() {});
+
+      // حماية فقط إذا ضاعت إشارة رفع الإصبع.
       _voiceTimer = Timer(
-        const Duration(seconds: 5),
+        const Duration(seconds: 30),
         () => _finishVoiceAnswer(word),
       );
     } catch (e) {
@@ -154,6 +161,11 @@ class _ReviewScreenState extends State<ReviewScreen>
         SnackBar(content: Text('تعذر تشغيل الميكروفون: $e')),
       );
     }
+  }
+
+  Future<void> _endVoiceAnswer(WordModel word) async {
+    if (!_voiceRecognition.isRecording || _voiceFinishing) return;
+    await _finishVoiceAnswer(word);
   }
 
   Future<void> _finishVoiceAnswer(WordModel word) async {
@@ -199,22 +211,24 @@ class _ReviewScreenState extends State<ReviewScreen>
         final error = state == SpeechRecognitionState.error;
 
         final title = preparing
-            ? 'تهيئة التعرف على الألمانية'
+            ? 'تهيئة التعرف على الألمانية...'
             : recording
-                ? 'جاري التسجيل — اضغط للإيقاف'
+                ? 'اترك الزر لإيقاف التسجيل'
                 : processing || _voiceFinishing
                     ? 'تحليل إجابتك...'
                     : error
                         ? 'إعادة محاولة الميكروفون'
                         : _voiceTranscript != null
-                            ? 'حاول مرة أخرى'
-                            : 'قلها بالألمانية';
+                            ? 'اضغط مطولًا للمحاولة مرة أخرى'
+                            : 'اضغط مطولًا وتحدث بالألمانية';
 
         final icon = recording
-            ? Icons.stop_rounded
+            ? Icons.mic_rounded
             : processing || preparing || _voiceFinishing
                 ? Icons.hourglass_top_rounded
-                : Icons.mic_rounded;
+                : Icons.mic_none_rounded;
+
+        final disabled = preparing || processing || _voiceFinishing;
 
         return Column(
           children: [
@@ -223,20 +237,31 @@ class _ReviewScreenState extends State<ReviewScreen>
               valueListenable: _voiceRecognition.downloadProgress,
               builder: (context, progress, _) {
                 final showProgress = preparing && progress > 0;
+
+                final button = FilledButton.icon(
+                  onPressed: disabled ? null : () {},
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(54),
+                    backgroundColor: recording ? _red : _primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFFBFC2D9),
+                    disabledForegroundColor: Colors.white,
+                  ),
+                  icon: Icon(icon),
+                  label: Text(title),
+                );
+
                 return Column(
                   children: [
-                    FilledButton.icon(
-                      onPressed: preparing || processing || _voiceFinishing
-                          ? null
-                          : () => _startOrStopVoiceAnswer(word),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                        backgroundColor: recording
-                            ? _red
-                            : const Color(0xFF5B5FEF),
-                      ),
-                      icon: Icon(icon),
-                      label: Text(title),
+                    Listener(
+                      behavior: HitTestBehavior.opaque,
+                      onPointerDown:
+                          disabled ? null : (_) => _beginVoiceAnswer(word),
+                      onPointerUp:
+                          disabled ? null : (_) => _endVoiceAnswer(word),
+                      onPointerCancel:
+                          disabled ? null : (_) => _endVoiceAnswer(word),
+                      child: button,
                     ),
                     if (showProgress) ...[
                       const SizedBox(height: 8),
@@ -407,6 +432,11 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     final direction =
         remembered ? const Offset(500, 40) : const Offset(-500, 40);
+
+    // امسح نتيجة الصوت للبطاقة السابقة قبل عرض البطاقة التالية.
+    _voiceTimer?.cancel();
+    _voiceTranscript = null;
+    _voiceCorrect = null;
 
     setState(() => _isAnimating = true);
 
