@@ -225,6 +225,281 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   }
 
 
+  void _choose(int index) {
+    if (_selected != null || _currentQuestion == null) return;
+    if (_currentQuestion!.type == _QuestionType.audioMatch) return;
+
+    final question = _currentQuestion!;
+    final correct = index == question.correctIndex;
+
+    setState(() {
+      _selected = index;
+      _answered++;
+      if (correct) {
+        _score++;
+        _streak++;
+      } else {
+        _streak = 0;
+      }
+    });
+
+    _scheduleFeedbackSpeech(question, _questionGeneration);
+  }
+
+  Future<void> _next() async {
+    if (_words.length < 2) return;
+
+    // Invalidate any delayed speech belonging to the previous question.
+    final nextGeneration = ++_questionGeneration;
+    await _speech.stop();
+    if (!mounted) return;
+
+    final question = _makeQuestion(_words);
+
+    setState(() {
+      _currentQuestion = question;
+      _selected = null;
+      _selectedAudioIndex = null;
+      _wrongAudioIndex = null;
+      _wrongTranslationIndex = null;
+      _matchedPairs.clear();
+    });
+
+    _scheduleAutoQuestionSpeech(question, nextGeneration);
+  }
+
+  void _scheduleAutoQuestionSpeech(
+    _Question question,
+    int generation,
+  ) {
+    // The audio-matching exercise is intentionally silent until
+    // the learner presses one of the audio cards.
+    if (question.type == _QuestionType.audioMatch) {
+      return;
+    }
+
+    final content = question.content?.trim();
+    if (content == null ||
+        content.isEmpty ||
+        !_questionContentIsGerman(question)) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _selected != null ||
+          generation != _questionGeneration ||
+          _currentQuestion != question) {
+        return;
+      }
+
+      _speech.speakGerman(
+        content,
+        activeKey: 'exercise-question',
+        automaticKey: 'exercise-question-$_speechSessionId-$generation',
+      );
+    });
+  }
+
+  void _scheduleFeedbackSpeech(_Question question, int generation) {
+    final sentence = question.word.example.trim();
+    final word = question.word.german.trim();
+    final content = sentence.isNotEmpty ? sentence : word;
+    final key = sentence.isNotEmpty
+        ? 'exercise-feedback-sentence'
+        : 'exercise-feedback-word';
+
+    if (content.isEmpty) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _selected == null ||
+          generation != _questionGeneration ||
+          _currentQuestion != question) {
+        return;
+      }
+
+      _speech.speakGerman(
+        content,
+        activeKey: key,
+        automaticKey: 'exercise-feedback-$_speechSessionId-$generation',
+      );
+    });
+  }
+
+  Future<void> _playAudioMatchWord(
+    _Question question,
+    int index,
+  ) async {
+    await _speech.speakGerman(
+      question.matchingWords[index].german,
+      activeKey: 'exercise-audio-match-$index',
+    );
+  }
+
+  Future<void> _selectAudio(int index) async {
+    final question = _currentQuestion;
+    if (question == null ||
+        question.type != _QuestionType.audioMatch ||
+        _matchedPairs.containsKey(index)) {
+      return;
+    }
+
+    setState(() {
+      _selectedAudioIndex = index;
+      _wrongAudioIndex = null;
+      _wrongTranslationIndex = null;
+    });
+
+    await _playAudioMatchWord(question, index);
+  }
+
+  void _selectTranslation(int translationIndex) {
+    final question = _currentQuestion;
+    final audioIndex = _selectedAudioIndex;
+
+    if (question == null ||
+        question.type != _QuestionType.audioMatch ||
+        audioIndex == null ||
+        _matchedPairs.containsKey(audioIndex) ||
+        _matchedPairs.containsValue(translationIndex)) {
+      return;
+    }
+
+    final expected =
+        question.matchingWords[audioIndex].translation.trim().toLowerCase();
+    final chosen =
+        question.matchingTranslations[translationIndex].trim().toLowerCase();
+
+    if (expected == chosen) {
+      setState(() {
+        _matchedPairs[audioIndex] = translationIndex;
+        _selectedAudioIndex = null;
+        _wrongAudioIndex = null;
+        _wrongTranslationIndex = null;
+      });
+
+      if (_matchedPairs.length == question.matchingWords.length) {
+        setState(() {
+          _answered++;
+          _score++;
+          _streak++;
+        });
+        return;
+      }
+
+      return;
+    }
+
+    setState(() {
+      _wrongAudioIndex = audioIndex;
+      _wrongTranslationIndex = translationIndex;
+      _streak = 0;
+    });
+
+    Future.delayed(const Duration(milliseconds: 650), () {
+      if (!mounted) return;
+
+      setState(() {
+        _selectedAudioIndex = null;
+        _wrongAudioIndex = null;
+        _wrongTranslationIndex = null;
+      });
+    });
+  }
+
+  String _typeName(_QuestionType type) {
+    switch (type) {
+      case _QuestionType.translation:
+        return 'معنى الكلمة';
+      case _QuestionType.germanWord:
+        return 'اختيار الكلمة';
+      case _QuestionType.sentenceTranslation:
+        return 'ترجمة الجملة';
+      case _QuestionType.sentenceGerman:
+        return 'الجملة الصحيحة';
+      case _QuestionType.completeSentence:
+        return 'إكمال الجملة';
+      case _QuestionType.findSentence:
+        return 'استخدام الكلمة';
+      case _QuestionType.audioMatch:
+        return 'استمع وطابق';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_words.length < 2 || _currentQuestion == null) {
+      return _empty();
+    }
+
+    final q = _currentQuestion!;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'اختبار المراجعة',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 18),
+            child: Center(
+              child: Text(
+                '$_score / $_answered',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
+          children: [
+            _hero(q),
+            const SizedBox(height: 14),
+            if (q.type == _QuestionType.audioMatch) ...[
+              _audioMatchQuestion(q),
+              if (_matchedPairs.length == q.matchingWords.length) ...[
+                const SizedBox(height: 12),
+                _audioMatchComplete(),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _next,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: const Text('السؤال التالي'),
+                ),
+              ],
+            ] else ...[
+              _questionCard(q),
+              const SizedBox(height: 14),
+              ...q.options.asMap().entries.map(
+                (entry) => _option(q, entry.key, entry.value),
+              ),
+              if (_selected != null) ...[
+                const SizedBox(height: 10),
+                _feedback(q),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _next,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: const Text('السؤال التالي'),
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _hero(_Question q) {
     return Container(
       padding: const EdgeInsets.all(18),
