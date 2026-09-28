@@ -135,13 +135,13 @@ class _ExportWordsScreenState extends State<ExportWordsScreen> {
             },
           ),
           _option(
-            icon: Icons.file_download_rounded,
+            icon: Icons.file_upload_rounded,
             title: 'استيراد كل الكلمات',
             subtitle: 'استيراد قاعدة الكلمات كاملة من ملف JSON',
             onTap: () => _export(reviewOnly: false),
           ),
           _option(
-            icon: Icons.file_download_rounded,
+            icon: Icons.file_upload_rounded,
             title: 'استيراد كلمات المراجعة',
             subtitle: 'استيراد كلمات المراجعة من ملف JSON',
             onTap: () => _export(reviewOnly: true),
