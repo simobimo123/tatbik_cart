@@ -391,6 +391,16 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     });
   }
 
+  Future<void> _playAudioMatchWord(
+    _Question question,
+    int index,
+  ) async {
+    await _speech.speakGerman(
+      question.matchingWords[index].german,
+      activeKey: 'exercise-audio-match-$index',
+    );
+  }
+
   Future<void> _selectAudio(int index) async {
     final question = _currentQuestion;
     if (question == null ||
@@ -405,10 +415,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       _wrongTranslationIndex = null;
     });
 
-    await _speech.speakGerman(
-      question.matchingWords[index].german,
-      activeKey: 'exercise-audio-match-$index',
-    );
+    await _playAudioMatchWord(question, index);
   }
 
   void _selectTranslation(int translationIndex) {
@@ -828,7 +835,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             color: background,
             borderRadius: BorderRadius.circular(20),
             child: InkWell(
-              onTap: matched ? null : () => _selectAudio(index),
+              onTap: () => matched
+                  ? _playAudioMatchWord(q, index)
+                  : _selectAudio(index),
               borderRadius: BorderRadius.circular(20),
               child: Container(
                 constraints: const BoxConstraints(
