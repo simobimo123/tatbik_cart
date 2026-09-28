@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/services/speech_service.dart';
+import '../../../core/services/speech_service.dart';
 
 class GermanReaderScreen extends StatefulWidget {
   const GermanReaderScreen({super.key});
