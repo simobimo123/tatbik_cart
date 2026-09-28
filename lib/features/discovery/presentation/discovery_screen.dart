@@ -352,8 +352,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         title: const Text('حذف المجموعة؟', style: TextStyle(fontWeight: FontWeight.w900)),
         content: Text(
           category.wordCount == 0
-              ? 'سيتم حذف المجموعة «' + category.name + '».',
-              : 'سيتم حذف المجموعة «' + category.name + '» وحذف الكلمات المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه.',
+              ? 'سيتم حذف المجموعة «${category.name}».':
+              : 'سيتم حذف المجموعة «${category.name}» وحذف الكلمات المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('إلغاء')),
@@ -403,7 +403,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                     (category) => DropdownMenuItem<int>(
                       value: category.id,
                       child: Text(
-                        category.name + ' • ' + _difficultyLabel(category.difficulty) + ' • ' + category.wordCount.toString(),
+                        '${category.name} • ${_difficultyLabel(category.difficulty)} • ${category.wordCount}',
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
