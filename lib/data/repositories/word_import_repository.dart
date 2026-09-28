@@ -64,6 +64,11 @@ class WordImportRepository {
       final exampleTranslation = raw['example_translation']?.toString().trim() ?? '';
       final difficulty = _normalizeDifficulty(raw['difficulty']?.toString());
       final category = raw['category']?.toString().trim() ?? '';
+      final hasCategoryDifficulty =
+          raw['category_difficulty'] != null ||
+              categoryDifficulties.containsKey(
+                _normalizedCategoryKey(category),
+              );
       final categoryDifficulty = _normalizeDifficulty(
         raw['category_difficulty']?.toString() ??
             categoryDifficulties[_normalizedCategoryKey(category)],
@@ -77,6 +82,7 @@ class WordImportRepository {
         'difficulty': difficulty,
         'category': category,
         'category_difficulty': categoryDifficulty,
+        'category_difficulty_explicit': hasCategoryDifficulty ? '1' : '0',
       });
     }
 
@@ -113,6 +119,18 @@ class WordImportRepository {
           );
           if (categoryRows.isNotEmpty) {
             categoryId = categoryRows.first['id'] as int;
+
+            if (item['category_difficulty_explicit'] == '1') {
+              await txn.update(
+                'categories',
+                {
+                  'difficulty':
+                      item['category_difficulty'] ?? 'unspecified',
+                },
+                where: 'id=?',
+                whereArgs: [categoryId],
+              );
+            }
           } else {
             final categoryDifficulty =
                 item['category_difficulty'] ?? 'unspecified';
