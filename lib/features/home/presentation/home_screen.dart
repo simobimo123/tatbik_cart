@@ -368,18 +368,18 @@ class _HomeScreenState extends State<HomeScreen> {
               () => _open(const LibraryScreen()),
             ),
             _action(
-              'الاستيراد',
-              'أدخل ملف JSON إلى الاكتشاف أو المراجعة مباشرة',
-              Icons.file_upload_rounded,
-              const Color(0xFFFFF3E8),
-              () => _open(const ImportWordsScreen()),
-            ),
-            _action(
               'التصدير',
               'صدّر الكلمات والجمل والترجمات في ملف JSON',
               Icons.file_download_rounded,
               const Color(0xFFEFF0FF),
               () => _open(const ExportWordsScreen()),
+            ),
+            _action(
+              'الاستيراد',
+              'أدخل ملف JSON إلى الاكتشاف أو المراجعة مباشرة',
+              Icons.file_upload_rounded,
+              const Color(0xFFFFF3E8),
+              () => _open(const ImportWordsScreen()),
             ),
             _action(
               'القارئ الألماني',
