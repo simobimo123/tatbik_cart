@@ -72,8 +72,10 @@ class WordExportRepository {
               'example_translation': word.exampleTranslation,
               'difficulty': word.difficulty,
               if (word.categoryName != null &&
-                  word.categoryName!.isNotEmpty)
+                  word.categoryName!.isNotEmpty) ...{
                 'category': word.categoryName,
+                'category_difficulty': word.categoryDifficulty,
+              },
             },
           )
           .toList(),
