@@ -156,152 +156,140 @@ class DatabaseHelper {
     // الكلمة بسبب اختلاف حالة الأحرف أو المسافات. نوحّدها
     // قبل إنشاء القيد الفريد، مع الحفاظ على حالة المراجعة
     // والاكتشاف الموجودة.
-              // الإصدارات السابقة كانت تسمح بوجود أكثر من سجل لنفس
-              // الكلمة بسبب اختلاف حالة الأحرف أو المسافات. نوحّدها
-              // قبل إنشاء القيد الفريد، مع الحفاظ على حالة المراجعة
-              // والاكتشاف الموجودة.
-              final duplicateKeys = await db.rawQuery(
-                'SELECT LOWER(TRIM(german)) AS word_key '
-                'FROM words '
-                'GROUP BY LOWER(TRIM(german)) '
-                'HAVING COUNT(*)>1',
-              );
-    
-              for (final duplicate in duplicateKeys) {
-                final key = duplicate['word_key'] as String;
-    
-                final rows = await db.query(
-                  'words',
-                  columns: [
-                    'id',
-                    'german',
-                    'translation',
-                    'example',
-                    'example_translation',
-                    'difficulty',
-                    'category_id',
-                    'builtin',
-                    'created_at',
-                  ],
-                  where: 'LOWER(TRIM(german))=?',
-                  whereArgs: [key],
-                  orderBy: 'builtin DESC, id ASC',
-                );
-    
-                if (rows.length < 2) continue;
-    
-                final keeper = rows.first;
-                final keeperId = keeper['id'] as int;
-                final duplicateIds =
-                    rows.skip(1).map((row) => row['id'] as int).toList();
-    
-                var mergedDifficulty =
-                    (keeper['difficulty'] as String?) ?? 'unspecified';
-                var mergedCategoryId = keeper['category_id'] as int?;
-                var mergedBuiltin = (keeper['builtin'] as int?) ?? 0;
-    
-                for (final row in rows.skip(1)) {
-                  if (mergedDifficulty == 'unspecified' &&
-                      row['difficulty'] != null &&
-                      row['difficulty'] != 'unspecified') {
-                    mergedDifficulty = row['difficulty'] as String;
-                  }
-                  mergedCategoryId ??= row['category_id'] as int?;
-                  if ((row['builtin'] as int? ?? 0) == 1) {
-                    mergedBuiltin = 1;
-                  }
-                }
-    
-                await db.update(
-                  'words',
-                  {
-                    'difficulty': mergedDifficulty,
-                    'category_id': mergedCategoryId,
-                    'builtin': mergedBuiltin,
-                  },
-                  where: 'id=?',
-                  whereArgs: [keeperId],
-                );
-    
-                final reviewPlaceholders =
-                    List.filled(duplicateIds.length + 1, '?').join(',');
-                final allReviewRows = await db.rawQuery(
-                  'SELECT word_id, interval_days, ease, repetitions, due_at '
-                  'FROM reviews '
-                  'WHERE word_id IN ($reviewPlaceholders) '
-                  'ORDER BY repetitions DESC, interval_days DESC, '
-                  'COALESCE(due_at, "") ASC, word_id ASC',
-                  [keeperId, ...duplicateIds],
-                );
-    
-                if (allReviewRows.isNotEmpty) {
-                  final bestReview = allReviewRows.first;
-                  await db.insert(
-                    'reviews',
-                    {
-                      'word_id': keeperId,
-                      'interval_days': bestReview['interval_days'],
-                      'ease': bestReview['ease'],
-                      'repetitions': bestReview['repetitions'],
-                      'due_at': bestReview['due_at'],
-                    },
-                    conflictAlgorithm: ConflictAlgorithm.replace,
-                  );
-                }
-    
-                final discoveryPlaceholders =
-                    List.filled(duplicateIds.length + 1, '?').join(',');
-                final allDiscoveryRows = await db.rawQuery(
-                  'SELECT word_id, known, discovered_at, due_step, '
-                  'times_seen, discovery_order '
-                  'FROM word_discoveries '
-                  'WHERE word_id IN ($discoveryPlaceholders) '
-                  'ORDER BY known ASC, times_seen DESC, discovery_order ASC, word_id ASC',
-                  [keeperId, ...duplicateIds],
-                );
-    
-                if (allDiscoveryRows.isNotEmpty) {
-                  final bestDiscovery = allDiscoveryRows.first;
-                  await db.insert(
-                    'word_discoveries',
-                    {
-                      'word_id': keeperId,
-                      'known': bestDiscovery['known'],
-                      'discovered_at': bestDiscovery['discovered_at'],
-                      'due_step': bestDiscovery['due_step'],
-                      'times_seen': bestDiscovery['times_seen'],
-                      'discovery_order': bestDiscovery['discovery_order'],
-                    },
-                    conflictAlgorithm: ConflictAlgorithm.replace,
-                  );
-                }
-    
-                for (final id in duplicateIds) {
-                  await db.delete(
-                    'reviews',
-                    where: 'word_id=?',
-                    whereArgs: [id],
-                  );
-                  await db.delete(
-                    'word_discoveries',
-                    where: 'word_id=?',
-                    whereArgs: [id],
-                  );
-                  await db.delete(
-                    'words',
-                    where: 'id=?',
-                    whereArgs: [id],
-                  );
-                }
-              }
-    
-              // من الآن فصاعدًا لا يمكن إدخال نفس الكلمة مرتين
-              // حتى لو اختلفت حالة الأحرف أو وُجدت مسافات زائدة.
-              await db.execute(
-                'CREATE UNIQUE INDEX IF NOT EXISTS words_german_unique '
-                'ON words(LOWER(TRIM(german)))',
-              );
-            }
+    final duplicateKeys = await db.rawQuery(
+      'SELECT LOWER(TRIM(german)) AS word_key '
+      'FROM words '
+      'GROUP BY LOWER(TRIM(german)) '
+      'HAVING COUNT(*)>1',
+    );
+
+    for (final duplicate in duplicateKeys) {
+      final key = duplicate['word_key'] as String;
+
+      final rows = await db.query(
+        'words',
+        columns: [
+          'id',
+          'german',
+          'translation',
+          'example',
+          'example_translation',
+          'difficulty',
+          'category_id',
+          'builtin',
+          'created_at',
+        ],
+        where: 'LOWER(TRIM(german))=?',
+        whereArgs: [key],
+        orderBy: 'builtin DESC, id ASC',
+      );
+
+      if (rows.length < 2) continue;
+
+      final keeper = rows.first;
+      final keeperId = keeper['id'] as int;
+      final duplicateIds =
+          rows.skip(1).map((row) => row['id'] as int).toList();
+
+      var mergedDifficulty =
+          (keeper['difficulty'] as String?) ?? 'unspecified';
+      var mergedCategoryId = keeper['category_id'] as int?;
+      var mergedBuiltin = (keeper['builtin'] as int?) ?? 0;
+
+      for (final row in rows.skip(1)) {
+        if (mergedDifficulty == 'unspecified' &&
+            row['difficulty'] != null &&
+            row['difficulty'] != 'unspecified') {
+          mergedDifficulty = row['difficulty'] as String;
+        }
+        mergedCategoryId ??= row['category_id'] as int?;
+        if ((row['builtin'] as int? ?? 0) == 1) {
+          mergedBuiltin = 1;
+        }
+      }
+
+      await db.update(
+        'words',
+        {
+          'difficulty': mergedDifficulty,
+          'category_id': mergedCategoryId,
+          'builtin': mergedBuiltin,
+        },
+        where: 'id=?',
+        whereArgs: [keeperId],
+      );
+
+      final reviewPlaceholders =
+          List.filled(duplicateIds.length + 1, '?').join(',');
+      final allReviewRows = await db.rawQuery(
+        'SELECT word_id, interval_days, ease, repetitions, due_at '
+        'FROM reviews '
+        'WHERE word_id IN ($reviewPlaceholders) '
+        'ORDER BY repetitions DESC, interval_days DESC, '
+        'COALESCE(due_at, "") ASC, word_id ASC',
+        [keeperId, ...duplicateIds],
+      );
+
+      if (allReviewRows.isNotEmpty) {
+        final bestReview = allReviewRows.first;
+        await db.insert(
+          'reviews',
+          {
+            'word_id': keeperId,
+            'interval_days': bestReview['interval_days'],
+            'ease': bestReview['ease'],
+            'repetitions': bestReview['repetitions'],
+            'due_at': bestReview['due_at'],
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+
+      final discoveryPlaceholders =
+          List.filled(duplicateIds.length + 1, '?').join(',');
+      final allDiscoveryRows = await db.rawQuery(
+        'SELECT word_id, known, discovered_at, due_step, '
+        'times_seen, discovery_order '
+        'FROM word_discoveries '
+        'WHERE word_id IN ($discoveryPlaceholders) '
+        'ORDER BY known ASC, times_seen DESC, discovery_order ASC, word_id ASC',
+        [keeperId, ...duplicateIds],
+      );
+
+      if (allDiscoveryRows.isNotEmpty) {
+        final bestDiscovery = allDiscoveryRows.first;
+        await db.insert(
+          'word_discoveries',
+          {
+            'word_id': keeperId,
+            'known': bestDiscovery['known'],
+            'discovered_at': bestDiscovery['discovered_at'],
+            'due_step': bestDiscovery['due_step'],
+            'times_seen': bestDiscovery['times_seen'],
+            'discovery_order': bestDiscovery['discovery_order'],
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+
+      for (final id in duplicateIds) {
+        await db.delete(
+          'reviews',
+          where: 'word_id=?',
+          whereArgs: [id],
+        );
+        await db.delete(
+          'word_discoveries',
+          where: 'word_id=?',
+          whereArgs: [id],
+        );
+        await db.delete(
+          'words',
+          where: 'id=?',
+          whereArgs: [id],
+        );
+      }
+    }
   }
 
   Future<void> _createTables(Database db) async {
