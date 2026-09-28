@@ -67,7 +67,7 @@ class _ExportWordsScreenState extends State<ExportWordsScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر إنشاء ملف التصدير: $e')),
+        SnackBar(content: Text('تعذر إنشاء ملف الاستيراد: $e')),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -98,7 +98,7 @@ class _ExportWordsScreenState extends State<ExportWordsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.file_upload_rounded,
+                  Icons.file_download_rounded,
                   color: Color(0xFF5B5FEF),
                   size: 31,
                 ),
@@ -123,7 +123,7 @@ class _ExportWordsScreenState extends State<ExportWordsScreen> {
           ),
           const SizedBox(height: 18),
           _option(
-            icon: Icons.file_download_rounded,
+            icon: Icons.file_upload_rounded,
             title: 'تصدير ملف JSON',
             subtitle: 'أدخل مجموعة كلمات إلى الاكتشاف أو المراجعة مباشرة',
             onTap: () async {
@@ -135,13 +135,13 @@ class _ExportWordsScreenState extends State<ExportWordsScreen> {
             },
           ),
           _option(
-            icon: Icons.file_upload_rounded,
+            icon: Icons.file_download_rounded,
             title: 'استيراد كل الكلمات',
             subtitle: 'استيراد قاعدة الكلمات كاملة من ملف JSON',
             onTap: () => _export(reviewOnly: false),
           ),
           _option(
-            icon: Icons.file_upload_rounded,
+            icon: Icons.file_download_rounded,
             title: 'استيراد كلمات المراجعة',
             subtitle: 'استيراد كلمات المراجعة من ملف JSON',
             onTap: () => _export(reviewOnly: true),
