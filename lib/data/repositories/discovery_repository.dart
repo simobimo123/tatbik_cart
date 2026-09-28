@@ -10,7 +10,7 @@ class DiscoveryRepository {
 
   Future<WordModel?> nextWord({
     int? categoryId,
-    String? difficulty,
+    String? groupDifficulty,
   }) async {
     final db = await _databaseHelper.database;
 
@@ -26,18 +26,19 @@ class DiscoveryRepository {
       args.add(categoryId);
     }
 
-    if (difficulty != null) {
-      if (difficulty == 'unspecified') {
-        filters.add("COALESCE(w.difficulty, 'unspecified')='unspecified'");
+    if (groupDifficulty != null) {
+      if (groupDifficulty == 'unspecified') {
+        filters.add("COALESCE(c.difficulty, 'unspecified')='unspecified'");
       } else {
-        filters.add('w.difficulty=?');
-        args.add(difficulty);
+        filters.add('c.difficulty=?');
+        args.add(groupDifficulty);
       }
     }
 
     final rows = await db.rawQuery(
       'SELECT w.* '
       'FROM words w '
+      'LEFT JOIN categories c ON c.id=w.category_id '
       'LEFT JOIN word_discoveries d ON d.word_id=w.id '
       'LEFT JOIN reviews r ON r.word_id=w.id '
       'WHERE ' + filters.join(' AND ') + ' '
@@ -54,7 +55,7 @@ class DiscoveryRepository {
   }
   Future<int> newWordCount({
     int? categoryId,
-    String? difficulty,
+    String? groupDifficulty,
   }) async {
     final db = await _databaseHelper.database;
 
@@ -69,12 +70,12 @@ class DiscoveryRepository {
       args.add(categoryId);
     }
 
-    if (difficulty != null) {
-      if (difficulty == 'unspecified') {
-        filters.add("COALESCE(w.difficulty, 'unspecified')='unspecified'");
+    if (groupDifficulty != null) {
+      if (groupDifficulty == 'unspecified') {
+        filters.add("COALESCE(c.difficulty, 'unspecified')='unspecified'");
       } else {
-        filters.add('w.difficulty=?');
-        args.add(difficulty);
+        filters.add('c.difficulty=?');
+        args.add(groupDifficulty);
       }
     }
 
@@ -82,6 +83,7 @@ class DiscoveryRepository {
           await db.rawQuery(
             'SELECT COUNT(*) '
             'FROM words w '
+            'LEFT JOIN categories c ON c.id=w.category_id '
             'LEFT JOIN word_discoveries d ON d.word_id=w.id '
             'WHERE ' + filters.join(' AND '),
             args,
@@ -91,7 +93,7 @@ class DiscoveryRepository {
   }
   Future<int> availableCount({
     int? categoryId,
-    String? difficulty,
+    String? groupDifficulty,
   }) async {
     final db = await _databaseHelper.database;
 
@@ -107,12 +109,12 @@ class DiscoveryRepository {
       args.add(categoryId);
     }
 
-    if (difficulty != null) {
-      if (difficulty == 'unspecified') {
-        filters.add("COALESCE(w.difficulty, 'unspecified')='unspecified'");
+    if (groupDifficulty != null) {
+      if (groupDifficulty == 'unspecified') {
+        filters.add("COALESCE(c.difficulty, 'unspecified')='unspecified'");
       } else {
-        filters.add('w.difficulty=?');
-        args.add(difficulty);
+        filters.add('c.difficulty=?');
+        args.add(groupDifficulty);
       }
     }
 
