@@ -721,7 +721,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            '\$matchedCount / \${q.matchingWords.length} أزواج صحيحة',
+            '$matchedCount / ${q.matchingWords.length} أزواج صحيحة',
             style: const TextStyle(
               color: Colors.black54,
               fontSize: 12,
