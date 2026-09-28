@@ -40,6 +40,8 @@ class _ReviewScreenState extends State<ReviewScreen>
 
   Timer? _voiceTimer;
   bool _voiceFinishing = false;
+  bool _voicePointerHeld = false;
+  bool _suppressCardTap = false;
   String? _voiceTranscript;
   bool? _voiceCorrect;
 
@@ -83,6 +85,8 @@ class _ReviewScreenState extends State<ReviewScreen>
 
   Future<void> _load({required bool resetSession}) async {
     _voiceTimer?.cancel();
+    _voicePointerHeld = false;
+    _suppressCardTap = false;
     await _voiceRecognition.cancelListening();
     _voiceTranscript = null;
     _voiceCorrect = null;
@@ -148,6 +152,14 @@ class _ReviewScreenState extends State<ReviewScreen>
       );
 
       if (!mounted) return;
+
+      // إذا رفع المستخدم إصبعه أثناء تهيئة Whisper، أوقف التسجيل
+      // فور بدء المحرك بدل أن يستمر في الخلفية.
+      if (!_voicePointerHeld) {
+        await _finishVoiceAnswer(word);
+        return;
+      }
+
       setState(() {});
 
       // حماية فقط إذا ضاعت إشارة رفع الإصبع.
@@ -164,8 +176,20 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
   Future<void> _endVoiceAnswer(WordModel word) async {
+    _voicePointerHeld = false;
+
     if (!_voiceRecognition.isRecording || _voiceFinishing) return;
     await _finishVoiceAnswer(word);
+  }
+
+  void _releaseVoicePointer() {
+    _voicePointerHeld = false;
+
+    Future<void>.delayed(const Duration(milliseconds: 180), () {
+      if (mounted) {
+        setState(() => _suppressCardTap = false);
+      }
+    });
   }
 
   Future<void> _finishVoiceAnswer(WordModel word) async {
@@ -255,12 +279,25 @@ class _ReviewScreenState extends State<ReviewScreen>
                   children: [
                     Listener(
                       behavior: HitTestBehavior.opaque,
-                      onPointerDown:
-                          disabled ? null : (_) => _beginVoiceAnswer(word),
-                      onPointerUp:
-                          disabled ? null : (_) => _endVoiceAnswer(word),
-                      onPointerCancel:
-                          disabled ? null : (_) => _endVoiceAnswer(word),
+                      onPointerDown: disabled
+                          ? null
+                          : (_) {
+                              _voicePointerHeld = true;
+                              _suppressCardTap = true;
+                              _beginVoiceAnswer(word);
+                            },
+                      onPointerUp: disabled
+                          ? null
+                          : (_) {
+                              _endVoiceAnswer(word);
+                              _releaseVoicePointer();
+                            },
+                      onPointerCancel: disabled
+                          ? null
+                          : (_) {
+                              _endVoiceAnswer(word);
+                              _releaseVoicePointer();
+                            },
                       child: button,
                     ),
                     if (showProgress) ...[
@@ -1444,7 +1481,9 @@ class _ReviewScreenState extends State<ReviewScreen>
                         width: double.infinity,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onTap: _voiceInputBusy ? null : _revealCard,
+                          onTap: (_voiceInputBusy || _suppressCardTap)
+                              ? null
+                              : _revealCard,
                           onPanUpdate:
                               _voiceInputBusy ? null : _handleDragUpdate,
                           onPanEnd: _voiceInputBusy ? null : _handleDragEnd,
