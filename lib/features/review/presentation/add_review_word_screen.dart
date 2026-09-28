@@ -24,7 +24,6 @@ class _AddReviewWordScreenState extends State<AddReviewWordScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCategories();
   }
 
   @override
@@ -63,6 +62,7 @@ class _AddReviewWordScreenState extends State<AddReviewWordScreen> {
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
