@@ -41,7 +41,7 @@ class DiscoveryRepository {
       'LEFT JOIN categories c ON c.id=w.category_id '
       'LEFT JOIN word_discoveries d ON d.word_id=w.id '
       'LEFT JOIN reviews r ON r.word_id=w.id '
-      'WHERE ' + filters.join(' AND ') + ' '
+      'WHERE ${filters.join(' AND ')} '
       'ORDER BY '
       'CASE WHEN d.word_id IS NULL THEN 0 ELSE 1 END ASC, '
       'CASE WHEN d.word_id IS NULL THEN w.id ELSE d.discovery_order END ASC, '
@@ -85,7 +85,7 @@ class DiscoveryRepository {
             'FROM words w '
             'LEFT JOIN categories c ON c.id=w.category_id '
             'LEFT JOIN word_discoveries d ON d.word_id=w.id '
-            'WHERE ' + filters.join(' AND '),
+            'WHERE ${filters.join(' AND ')},
             args,
           ),
         ) ??
