@@ -339,18 +339,16 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     _Question question,
     int generation,
   ) {
-    String? content;
-    String key = 'exercise-question';
+    // The audio-matching exercise is intentionally silent until
+    // the learner presses one of the audio cards.
+    if (question.type == _QuestionType.audioMatch) return;
 
-    if (question.type == _QuestionType.audioMatch) {
-      if (question.matchingWords.isEmpty) return;
-      content = question.matchingWords.first.german;
-      key = 'exercise-audio-match-0';
-    } else if (_questionContentIsGerman(question)) {
-      content = question.content?.trim();
+    final content = question.content?.trim();
+    if (content == null ||
+        content.isEmpty ||
+        !_questionContentIsGerman(question)) {
+      return;
     }
-
-    if (content == null || content.trim().isEmpty) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
@@ -361,8 +359,8 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       }
 
       _speech.speakGerman(
-        content!,
-        activeKey: key,
+        content,
+        activeKey: 'exercise-question',
         automaticKey: 'exercise-question-$_speechSessionId-$generation',
       );
     });
@@ -455,10 +453,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         return;
       }
 
-      _scheduleNextUnmatchedAudio(
-        question,
-        _questionGeneration,
-      );
       return;
     }
 
@@ -476,35 +470,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         _wrongAudioIndex = null;
         _wrongTranslationIndex = null;
       });
-    });
-  }
-
-  void _scheduleNextUnmatchedAudio(
-    _Question question,
-    int generation,
-  ) {
-    int? nextIndex;
-
-    for (var i = 0; i < question.matchingWords.length; i++) {
-      if (!_matchedPairs.containsKey(i)) {
-        nextIndex = i;
-        break;
-      }
-    }
-
-    if (nextIndex == null) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted ||
-          _currentQuestion != question ||
-          generation != _questionGeneration) {
-        return;
-      }
-
-      _speech.speakGerman(
-        question.matchingWords[nextIndex!].german,
-        activeKey: 'exercise-audio-match-$nextIndex',
-      );
     });
   }
 
