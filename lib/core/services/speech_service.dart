@@ -15,10 +15,18 @@ class SpeechService {
   final ValueNotifier<String?> activeKey = ValueNotifier<String?>(null);
   final ValueNotifier<bool> speaking = ValueNotifier<bool>(false);
 
-  Future<void> initialize() async {
-    if (_initialized) return;
-    _initialized = true;
+  Future<void>? _initializeFuture;
 
+  Future<void> initialize() {
+    final existing = _initializeFuture;
+    if (existing != null) return existing;
+
+    final future = _initialize();
+    _initializeFuture = future;
+    return future;
+  }
+
+  Future<void> _initialize() async {
     try {
       await _tts.setLanguage('de-DE');
       await _tts.setSpeechRate(0.42);
@@ -33,20 +41,20 @@ class SpeechService {
 
       _tts.setCompletionHandler(() {
         speaking.value = false;
-        this.activeKey.value = null;
+        activeKey.value = null;
       });
 
       _tts.setCancelHandler(() {
         speaking.value = false;
-        this.activeKey.value = null;
+        activeKey.value = null;
       });
 
       _tts.setErrorHandler((_) {
         speaking.value = false;
-        this.activeKey.value = null;
+        activeKey.value = null;
       });
 
-      // Use an installed German voice when the platform exposes one.
+      // Prefer an installed German voice when the platform exposes one.
       try {
         final voices = await _tts.getVoices;
         if (voices is List) {
@@ -82,8 +90,7 @@ class SpeechService {
           }
         }
       } catch (_) {
-        // The default German voice remains valid when voice discovery
-        // is unavailable on the current platform.
+        // Keep the platform default German voice.
       }
 
       _ready = true;
@@ -91,7 +98,6 @@ class SpeechService {
       _ready = false;
     }
   }
-
   Future<void> speakGerman(
     String text, {
     String? activeKey,
