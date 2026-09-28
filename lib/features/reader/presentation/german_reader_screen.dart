@@ -286,7 +286,7 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
           ),
           const SizedBox(height: 11),
           FilledButton.icon(
-            onPressed: _ready && hasText ? _showText : null,
+            onPressed: hasText ? _showText : null,
             icon: const Icon(Icons.chrome_reader_mode_rounded),
             label: const Text('ابدأ القراءة'),
           ),
@@ -334,116 +334,122 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
     final sentenceKey = 'sentence-$index';
     final words = _splitWords(sentence);
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(15, 15, 15, 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: sentencePlaying
-              ? const Color(0xFFCBCBFF)
-              : const Color(0xFFE5E7EF),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: sentencePlaying ? .08 : .035),
-            blurRadius: sentencePlaying ? 18 : 10,
-            offset: const Offset(0, 4),
+    return ValueListenableBuilder<String?>(
+      valueListenable: _speech.activeKey,
+      builder: (context, activeKey, _) {
+        final sentencePlaying = activeKey == sentenceKey;
+
+        return Container(
+          padding: const EdgeInsets.fromLTRB(15, 15, 15, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: sentencePlaying
+                  ? const Color(0xFFCBCBFF)
+                  : const Color(0xFFE5E7EF),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: sentencePlaying ? .08 : .035,
+                ),
+                blurRadius: sentencePlaying ? 18 : 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ValueListenableBuilder<String?>(
-                valueListenable: _speech.activeKey,
-                builder: (context, activeKey, _) {
-                  return _buildSentenceSpeaker(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSentenceSpeaker(
                     sentence,
                     sentenceKey,
-                    active: activeKey == sentenceKey,
-                  );
-                },
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4F8),
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: Text(
-                        'Satz ${index + 1}',
-                        style: const TextStyle(
-                          color: Colors.black45,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                    active: sentencePlaying,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F4F8),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Text(
+                            'Satz ${index + 1}',
+                            style: const TextStyle(
+                              color: Colors.black45,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Text(
+                          sentence,
+                          textDirection: TextDirection.ltr,
+                          textAlign: TextAlign.left,
+                          style: TextStyle(
+                            color: _text,
+                            fontSize: sentence.length > 65 ? 18 : 21,
+                            height: 1.55,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      sentence,
-                      textDirection: TextDirection.ltr,
-                      textAlign: TextAlign.left,
-                      style: TextStyle(
-                        color: _text,
-                        fontSize: sentence.length > 65 ? 18 : 21,
-                        height: 1.55,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  ),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 13),
+                child: Divider(height: 1),
+              ),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.record_voice_over_outlined,
+                    size: 17,
+                    color: Colors.black45,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'الكلمات الألمانية',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              Wrap(
+                spacing: 7,
+                runSpacing: 8,
+                children: [
+                  for (var wordIndex = 0;
+                      wordIndex < words.length;
+                      wordIndex++)
+                    _buildWordButton(
+                      words[wordIndex],
+                      '$sentenceKey-word-$wordIndex',
+                    ),
+                ],
               ),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 13),
-            child: Divider(height: 1),
-          ),
-          const Row(
-            children: [
-              Icon(
-                Icons.record_voice_over_outlined,
-                size: 17,
-                color: Colors.black45,
-              ),
-              SizedBox(width: 6),
-              Text(
-                'الكلمات الألمانية',
-                style: TextStyle(
-                  color: Colors.black54,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 9),
-          Wrap(
-            spacing: 7,
-            runSpacing: 8,
-            children: [
-              for (var wordIndex = 0; wordIndex < words.length; wordIndex++)
-                _buildWordButton(
-                  words[wordIndex],
-                  '$sentenceKey-word-$wordIndex',
-                ),
-            ],
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
