@@ -470,18 +470,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     );
   }
 
-  Widget _discoveryCategoryDraftTypeMarker() => const SizedBox.shrink();
-
-class _DiscoveryCategoryDraft {
-  const _DiscoveryCategoryDraft({required this.name, required this.difficulty});
-  final String name;
-  final String difficulty;
-}
-
-class _DiscoveryCategoryDifficultyDialog extends StatelessWidget {
-  const _DiscoveryCategoryDifficultyDialog({required this.initialDifficulty});
-  final String initialDifficulty;
-
   @override
   Widget build(BuildContext context) {
     return _DifficultyDialog(initialDifficulty: initialDifficulty);
@@ -847,3 +835,13 @@ class _DifficultyDialogState extends State<_DifficultyDialog> {
     );
   }
 }
+
+class _DiscoveryCategoryDraft {
+  const _DiscoveryCategoryDraft({required this.name, required this.difficulty});
+  final String name;
+  final String difficulty;
+}
+
+class _DiscoveryCategoryDifficultyDialog extends StatelessWidget {
+  const _DiscoveryCategoryDifficultyDialog({required this.initialDifficulty});
+  final String initialDifficulty;
