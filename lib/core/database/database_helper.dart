@@ -140,7 +140,6 @@ class DatabaseHelper {
           final duplicateKeys = await db.rawQuery(
             'SELECT LOWER(TRIM(german)) AS word_key '
             'FROM words '
-            'WHERE TRIM(german)<>"" '
             'GROUP BY LOWER(TRIM(german)) '
             'HAVING COUNT(*)>1',
           );
@@ -354,9 +353,10 @@ class DatabaseHelper {
       for (final item in catalog) {
         final existing = await txn.query(
           'words',
-          columns: ['id'],
-          where: 'german=? AND builtin=1',
+          columns: ['id', 'builtin'],
+          where: 'LOWER(TRIM(german))=LOWER(TRIM(?))',
           whereArgs: [item.german],
+          orderBy: 'builtin DESC, id ASC',
           limit: 1,
         );
 
@@ -394,13 +394,41 @@ class DatabaseHelper {
 
         if (existing.isEmpty) {
           await txn.insert('words', values);
-        } else {
+        } else if ((existing.first['builtin'] as int? ?? 0) == 1) {
           await txn.update(
             'words',
             values,
             where: 'id=?',
             whereArgs: [existing.first['id']],
           );
+        } else {
+          // لا ننشئ نسخة من كلمة يملكها المستخدم أصلًا.
+          // إذا كانت الكلمة مرتبطة بالمراجعة أو الاكتشاف، نحافظ
+          // على سجل المستخدم كما هو.
+          final existingId = existing.first['id'] as int;
+          final hasReview = Sqflite.firstIntValue(
+                await txn.rawQuery(
+                  'SELECT COUNT(*) FROM reviews WHERE word_id=?',
+                  [existingId],
+                ),
+              ) ??
+              0;
+          final hasDiscovery = Sqflite.firstIntValue(
+                await txn.rawQuery(
+                  'SELECT COUNT(*) FROM word_discoveries WHERE word_id=?',
+                  [existingId],
+                ),
+              ) ??
+              0;
+
+          if (hasReview == 0 && hasDiscovery == 0) {
+            await txn.update(
+              'words',
+              values,
+              where: 'id=?',
+              whereArgs: [existingId],
+            );
+          }
         }
       }
     });
