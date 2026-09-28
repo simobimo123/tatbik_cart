@@ -139,6 +139,6 @@ class SpeechService {
     }
 
     speaking.value = false;
-    this.activeKey.value = null;
+    activeKey.value = null;
   }
 }
