@@ -492,23 +492,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     }
   }
 
-  String _typeName(_QuestionType type) {
-    switch (type) {
-      case _QuestionType.translation:
-        return 'معنى الكلمة';
-      case _QuestionType.germanWord:
-        return 'اختيار الكلمة';
-      case _QuestionType.sentenceTranslation:
-        return 'ترجمة الجملة';
-      case _QuestionType.sentenceGerman:
-        return 'الجملة الصحيحة';
-      case _QuestionType.completeSentence:
-        return 'إكمال الجملة';
-      case _QuestionType.findSentence:
-        return 'استخدام الكلمة';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
