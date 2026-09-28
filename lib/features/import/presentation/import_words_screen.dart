@@ -81,7 +81,7 @@ class _ImportWordsScreenState extends State<ImportWordsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('تصدير الكلمات', style: TextStyle(fontWeight: FontWeight.w800))),
+      appBar: AppBar(title: const Text('استيراد الكلمات', style: TextStyle(fontWeight: FontWeight.w800))),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
         children: [
@@ -97,10 +97,10 @@ class _ImportWordsScreenState extends State<ImportWordsScreen> {
               children: [
                 Icon(Icons.file_download_rounded, color: Color(0xFF5B5FEF), size: 32),
                 SizedBox(height: 12),
-                Text('تصدير ملف الكلمات', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                Text('استيراد ملف الكلمات', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                 SizedBox(height: 7),
                 Text(
-                  'اختر ملف JSON من الهاتف ثم حدد المكان الذي تريد وضع الكلمات فيه.',
+                  'اختر ملف JSON من الهاتف ثم حدد أين تريد إضافة الكلمات.',
                   style: TextStyle(color: Colors.black54, height: 1.5),
                 ),
               ],
