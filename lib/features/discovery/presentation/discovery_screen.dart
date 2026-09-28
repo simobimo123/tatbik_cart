@@ -352,7 +352,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         title: const Text('حذف المجموعة؟', style: TextStyle(fontWeight: FontWeight.w900)),
         content: Text(
           category.wordCount == 0
-              ? 'سيتم حذف المجموعة «${category.name}».':
+              ? 'سيتم حذف المجموعة «${category.name}».'
               : 'سيتم حذف المجموعة «${category.name}» وحذف الكلمات المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه.',
         ),
         actions: [
