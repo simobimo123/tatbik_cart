@@ -102,7 +102,21 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       _showMeaning = !known;
     });
 
-    await _repository.answer(word, known: known);
+    try {
+      await _repository.answer(word, known: known);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _showMeaning = false;
+        _dragDx = 0;
+        _isDragging = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حفظ قرار الاكتشاف: $e')),
+      );
+      return;
+    }
 
     if (!mounted) return;
 
@@ -126,11 +140,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   void _handleDragEnd(DragEndDetails details) {
     if (_busy || _word == null) return;
 
-    final velocity = details.primaryVelocity ?? 0;
-
-    if (_dragDx > 145 || velocity > 1500) {
+    // السرعة وحدها لا تكفي لقبول الإجابة؛ يجب أن تكون المسافة
+    // واضحة حتى لا تتحول حركة قصيرة أو غير مقصودة إلى قرار.
+    if (_dragDx > 170) {
       _answer(true);
-    } else if (_dragDx < -145 || velocity < -1500) {
+    } else if (_dragDx < -170) {
       _answer(false);
     } else {
       setState(() {
