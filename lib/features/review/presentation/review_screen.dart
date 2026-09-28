@@ -1087,6 +1087,14 @@ class _ReviewScreenState extends State<ReviewScreen>
     );
   }
 
+  bool get _voiceInputBusy {
+    final state = _voiceRecognition.state.value;
+    return _voiceFinishing ||
+        state == SpeechRecognitionState.preparing ||
+        state == SpeechRecognitionState.recording ||
+        state == SpeechRecognitionState.processing;
+  }
+
   Widget _buildSwipeHint() {
     final horizontal = (_dragOffset.dx / 130).clamp(-1.0, 1.0);
     final vertical = (_dragOffset.dy / 150).clamp(0.0, 1.0);
@@ -1390,18 +1398,10 @@ class _ReviewScreenState extends State<ReviewScreen>
                         width: double.infinity,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onTap: _voiceRecognition.isRecording ||
-                                  _voiceFinishing
-                              ? null
-                              : _revealCard,
-                          onPanUpdate: _voiceRecognition.isRecording ||
-                                  _voiceFinishing
-                              ? null
-                              : _handleDragUpdate,
-                          onPanEnd: _voiceRecognition.isRecording ||
-                                  _voiceFinishing
-                              ? null
-                              : _handleDragEnd,
+                          onTap: _voiceInputBusy ? null : _revealCard,
+                          onPanUpdate:
+                              _voiceInputBusy ? null : _handleDragUpdate,
+                          onPanEnd: _voiceInputBusy ? null : _handleDragEnd,
                           child: Stack(
                             fit: StackFit.expand,
                             alignment: Alignment.center,
