@@ -251,13 +251,21 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           voiceTarget: word.example,
         );
       case _QuestionType.repeatAudio:
+        final canRepeatSentence =
+            word.example.trim().isNotEmpty &&
+            word.exampleTranslation.trim().isNotEmpty;
+        final repeatSentence =
+            canRepeatSentence && _random.nextBool();
+
         return _Question(
           type: _QuestionType.repeatAudio,
           word: word,
           options: const [],
           correctIndex: -1,
-          prompt: 'استمع ثم كرر ما سمعته بالألمانية',
-          voiceTarget: word.german,
+          prompt: repeatSentence
+              ? 'استمع ثم كرر الجملة بالألمانية'
+              : 'استمع ثم كرر الكلمة بالألمانية',
+          voiceTarget: repeatSentence ? word.example : word.german,
         );
     }
   }
