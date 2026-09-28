@@ -42,6 +42,7 @@ class SpeechRecognitionService {
   Future<WhisperStreamTask>? _startingTaskFuture;
   Future<void>? _prepareFuture;
   bool _stopRequested = false;
+  int _startGeneration = 0;
 
   bool get isRecording =>
       state.value == SpeechRecognitionState.recording;
@@ -114,14 +115,23 @@ class SpeechRecognitionService {
   }) async {
     if (isRecording) return;
 
+    final startGeneration = ++_startGeneration;
+
     await prepare();
+
+    // إذا أُلغي الضغط أثناء تجهيز النموذج، لا نبدأ التسجيل بعد
+    // انتهاء التجهيز.
+    if (startGeneration != _startGeneration) return;
+
     final engine = _engine;
 
     if (engine == null) {
       throw StateError('محرك التعرف على الكلام غير جاهز.');
     }
 
-    await cancelListening();
+    await _cancelActiveListening(invalidateStart: false);
+
+    if (startGeneration != _startGeneration) return;
 
     liveText.value = '';
     _stopRequested = false;
@@ -264,6 +274,17 @@ class SpeechRecognitionService {
   }
 
   Future<void> cancelListening() async {
+    ++_startGeneration;
+    await _cancelActiveListening();
+  }
+
+  Future<void> _cancelActiveListening({
+    bool invalidateStart = true,
+  }) async {
+    if (invalidateStart) {
+      ++_startGeneration;
+    }
+
     _stopRequested = true;
 
     final task = _streamTask;
