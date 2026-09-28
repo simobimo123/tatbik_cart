@@ -9,14 +9,7 @@ import '../../export/presentation/export_words_screen.dart';
 import '../../../core/services/speech_service.dart';
 
 class ReviewScreen extends StatefulWidget {
-  const ReviewScreen({
-    super.key,
-    this.categoryId,
-    this.difficulty,
-  });
-
-  final int? categoryId;
-  final String? difficulty;
+  const ReviewScreen({super.key});
 
   @override
   State<ReviewScreen> createState() => _ReviewScreenState();
@@ -78,11 +71,7 @@ class _ReviewScreenState extends State<ReviewScreen>
       setState(() => _loading = true);
     }
 
-    final queue = await _words.dueWords(
-      limit: 300,
-      categoryId: widget.categoryId,
-      difficulty: widget.difficulty,
-    );
+    final queue = await _words.dueWords(limit: 300);
 
     if (!mounted) return;
 
@@ -168,11 +157,7 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
   Future<void> _appendMoreDueWords() async {
-    final more = await _words.dueWords(
-      limit: 300,
-      categoryId: widget.categoryId,
-      difficulty: widget.difficulty,
-    );
+    final more = await _words.dueWords(limit: 300);
     if (!mounted || more.isEmpty) return;
 
     setState(() {
@@ -1054,9 +1039,7 @@ class _ReviewScreenState extends State<ReviewScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.categoryId != null || widget.difficulty != null
-                  ? 'المراجعة المفلترة'
-                  : 'المراجعة',
+              'المراجعة',
               style: const TextStyle(fontWeight: FontWeight.w800),
             ),
             Text(
