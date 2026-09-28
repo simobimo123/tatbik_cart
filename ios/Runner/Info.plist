@@ -4,8 +4,6 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>يُستخدم الميكروفون لتمارين التحدث بالألمانية.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
