@@ -19,11 +19,20 @@ class SpeechService {
   Future<void>? _initializeFuture;
 
   Future<void> initialize() {
+    if (_ready) return Future<void>.value();
+
     final existing = _initializeFuture;
     if (existing != null) return existing;
 
     final future = _initialize();
     _initializeFuture = future;
+
+    future.then((_) {
+      if (!_ready && identical(_initializeFuture, future)) {
+        _initializeFuture = null;
+      }
+    });
+
     return future;
   }
 
