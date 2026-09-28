@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/speech_service.dart';
+import '../../../data/models/category_model.dart';
 import '../../../data/models/word_model.dart';
+import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/discovery_repository.dart';
 
 class DiscoveryScreen extends StatefulWidget {
@@ -12,10 +14,14 @@ class DiscoveryScreen extends StatefulWidget {
 
 class _DiscoveryScreenState extends State<DiscoveryScreen> {
   final _repository = DiscoveryRepository();
+  final _categories = CategoryRepository();
   final _speech = SpeechService.instance;
 
   WordModel? _word;
   int _available = 0;
+  List<CategoryModel> _categoryList = [];
+  int? _selectedCategoryId;
+  String? _selectedDifficulty;
   bool _loading = true;
   bool _busy = false;
   bool _showMeaning = false;
@@ -32,7 +38,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   void initState() {
     super.initState();
     _speech.initialize();
-    _load();
+    _load(refreshCategories: true);
   }
 
   @override
@@ -41,14 +47,27 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _showMeaning = false;
-    });
+  Future<void> _load({bool refreshCategories = false}) async {
+    if (refreshCategories) {
+      _categoryList = await _categories.getCategories();
+    }
 
-    final word = await _repository.nextWord();
-    final available = await _repository.availableCount();
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _showMeaning = false;
+      });
+    }
+
+    final word = await _repository.nextWord(
+      categoryId: _selectedCategoryId,
+      difficulty: _selectedDifficulty,
+    );
+    final available = await _repository.availableCount(
+      categoryId: _selectedCategoryId,
+      difficulty: _selectedDifficulty,
+    );
+
     if (!mounted) return;
 
     setState(() {
@@ -63,18 +82,17 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     });
 
     if (word != null) {
-      final automaticKey = 'discovery-$_displayGeneration-${word.id}';
+      final automaticKey = 'discovery-' + _displayGeneration.toString() + '-' + word.id.toString();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _busy) return;
         _speech.speakGerman(
           word.german,
-          activeKey: 'discovery-word-${word.id}',
+          activeKey: 'discovery-word-' + word.id.toString(),
           automaticKey: automaticKey,
         );
       });
     }
   }
-
   Future<void> _answer(bool known) async {
     final word = _word;
     if (word == null || _busy) return;
@@ -93,7 +111,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     );
 
     if (!mounted) return;
-    await _load();
+    await _load(refreshCategories: true);
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
