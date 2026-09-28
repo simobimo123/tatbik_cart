@@ -130,7 +130,7 @@ class SpeechRecognitionService {
     // ونُبقي واجهة المراجعة في حالة انشغال حتى تصبح المهمة جاهزة.
     state.value = SpeechRecognitionState.preparing;
 
-    Future<WhisperStreamTask> startFuture;
+    Future<WhisperStreamTask>? startFuture;
 
     try {
       startFuture = engine.transcribeMicrophone(
