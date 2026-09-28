@@ -10,6 +10,8 @@ class SpeechService {
 
   bool _ready = false;
   String? _lastAutomaticKey;
+  int _speechRequestId = 0;
+  int? _activeRequestId;
 
   final ValueNotifier<String?> activeKey = ValueNotifier<String?>(null);
   final ValueNotifier<bool> speaking = ValueNotifier<bool>(false);
@@ -35,20 +37,27 @@ class SpeechService {
       await _tts.awaitSpeakCompletion(true);
 
       _tts.setStartHandler(() {
+        if (_activeRequestId == null) return;
         speaking.value = true;
       });
 
       _tts.setCompletionHandler(() {
+        if (_activeRequestId == null) return;
+        _activeRequestId = null;
         speaking.value = false;
         activeKey.value = null;
       });
 
       _tts.setCancelHandler(() {
+        if (_activeRequestId == null) return;
+        _activeRequestId = null;
         speaking.value = false;
         activeKey.value = null;
       });
 
       _tts.setErrorHandler((_) {
+        if (_activeRequestId == null) return;
+        _activeRequestId = null;
         speaking.value = false;
         activeKey.value = null;
       });
@@ -105,8 +114,10 @@ class SpeechService {
     final value = text.trim();
     if (value.isEmpty) return;
 
+    final requestId = ++_speechRequestId;
+
     await initialize();
-    if (!_ready) return;
+    if (!_ready || requestId != _speechRequestId) return;
 
     if (automaticKey != null) {
       if (_lastAutomaticKey == automaticKey) return;
@@ -114,24 +125,42 @@ class SpeechService {
     }
 
     try {
+      _activeRequestId = null;
       await _tts.stop();
 
+      if (requestId != _speechRequestId) return;
+
+      _activeRequestId = requestId;
       this.activeKey.value = activeKey;
       speaking.value = true;
 
       final result = await _tts.speak(value);
 
+      if (requestId != _speechRequestId ||
+          _activeRequestId != requestId) {
+        return;
+      }
+
       if (result is num && result == 0) {
+        _activeRequestId = null;
         speaking.value = false;
         this.activeKey.value = null;
       }
     } catch (_) {
+      if (requestId != _speechRequestId ||
+          _activeRequestId != requestId) {
+        return;
+      }
+
+      _activeRequestId = null;
       speaking.value = false;
       this.activeKey.value = null;
     }
   }
-
   Future<void> stop() async {
+    ++_speechRequestId;
+    _activeRequestId = null;
+
     try {
       await _tts.stop();
     } catch (_) {
