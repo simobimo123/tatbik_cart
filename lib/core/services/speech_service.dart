@@ -8,7 +8,6 @@ class SpeechService {
 
   final FlutterTts _tts = FlutterTts();
 
-  bool _initialized = false;
   bool _ready = false;
   String? _lastAutomaticKey;
 
