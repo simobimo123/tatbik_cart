@@ -494,10 +494,13 @@ class _ReviewScreenState extends State<ReviewScreen>
     final direction =
         remembered ? const Offset(500, 40) : const Offset(-500, 40);
 
-    // امسح نتيجة الصوت للبطاقة السابقة قبل عرض البطاقة التالية.
+    // أوقف كل صوت مرتبط بالبطاقة القديمة قبل بدء انتقالها،
+    // حتى لا يستمر TTS أثناء ظهور البطاقة التالية.
     _voiceTimer?.cancel();
     _voiceTranscript = null;
     _voiceCorrect = null;
+    _voiceWordId = null;
+    await _speech.stop();
 
     setState(() => _isAnimating = true);
 
@@ -639,6 +642,10 @@ class _ReviewScreenState extends State<ReviewScreen>
     if (_isAnimating || _queue.isEmpty) return;
 
     final word = _queue.first;
+
+    await _speech.stop();
+    _voiceTimer?.cancel();
+    _voiceWordId = null;
 
     setState(() => _isAnimating = true);
 
