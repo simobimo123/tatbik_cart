@@ -180,6 +180,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           'اكتشاف الكلمات',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
+        actions: [_discoveryFilterButton()],
       ),
       body: Center(
         child: Padding(
@@ -228,6 +229,305 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     );
   }
 
+  String _difficultyLabel(String? value) {
+    switch (value) {
+      case 'easy':
+        return 'سهل';
+      case 'medium':
+        return 'متوسط';
+      case 'hard':
+        return 'صعب';
+      default:
+        return 'غير محدد';
+    }
+  }
+
+  Future<void> _addDiscoveryCategory() async {
+    final controller = TextEditingController();
+    var difficulty = 'unspecified';
+
+    final draft = await showDialog<_DiscoveryCategoryDraft>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('إضافة مجموعة للاكتشاف', style: TextStyle(fontWeight: FontWeight.w900)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                autofocus: true,
+                textDirection: TextDirection.rtl,
+                decoration: const InputDecoration(
+                  labelText: 'اسم المجموعة / الموضوع',
+                  hintText: 'مثال: الحياة اليومية',
+                ),
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                initialValue: difficulty,
+                decoration: const InputDecoration(labelText: 'مستوى المجموعة'),
+                items: const [
+                  DropdownMenuItem(value: 'easy', child: Text('سهل')),
+                  DropdownMenuItem(value: 'medium', child: Text('متوسط')),
+                  DropdownMenuItem(value: 'hard', child: Text('صعب')),
+                  DropdownMenuItem(value: 'unspecified', child: Text('غير محدد')),
+                ],
+                onChanged: (value) {
+                  if (value != null) setDialogState(() => difficulty = value);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final name = controller.text.trim();
+                if (name.isEmpty) return;
+                Navigator.of(dialogContext).pop(
+                  _DiscoveryCategoryDraft(name: name, difficulty: difficulty),
+                );
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    controller.dispose();
+    if (!mounted || draft == null) return;
+
+    try {
+      final id = await _categories.create(draft.name, difficulty: draft.difficulty);
+      _categoryList = await _categories.getCategories();
+      _selectedCategoryId = id;
+      if (mounted) await _load(refreshCategories: false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حفظ المجموعة: ' + e.toString())),
+      );
+    }
+  }
+
+  Future<void> _editDiscoveryCategory(CategoryModel category) async {
+    final difficulty = await showDialog<String>(
+      context: context,
+      builder: (_) => _DiscoveryCategoryDifficultyDialog(
+        initialDifficulty: category.difficulty,
+      ),
+    );
+    if (!mounted || difficulty == null) return;
+    try {
+      await _categories.updateDifficulty(category.id, difficulty);
+      _categoryList = await _categories.getCategories();
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحديث المجموعة: ' + e.toString())),
+      );
+    }
+  }
+
+  Future<void> _deleteDiscoveryCategory(CategoryModel category) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('حذف المجموعة؟', style: TextStyle(fontWeight: FontWeight.w900)),
+        content: Text(
+          category.wordCount == 0
+              ? 'سيتم حذف المجموعة «' + category.name + '».',
+              : 'سيتم حذف المجموعة «' + category.name + '» وحذف الكلمات المرتبطة بها. هذا الإجراء لا يمكن التراجع عنه.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    try {
+      await _categories.delete(category.id);
+      _categoryList = await _categories.getCategories();
+      if (_selectedCategoryId == category.id) _selectedCategoryId = null;
+      await _load(refreshCategories: false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حذف المجموعة: ' + e.toString())),
+      );
+    }
+  }
+
+  Future<void> _showDiscoveryFilters() async {
+    var categoryId = _selectedCategoryId;
+    var groupDifficulty = _selectedGroupDifficulty;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('فلترة الاكتشاف', style: TextStyle(fontWeight: FontWeight.w900)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: categoryId ?? -1,
+                decoration: const InputDecoration(
+                  labelText: 'الموضوع / المجموعة',
+                  prefixIcon: Icon(Icons.folder_rounded),
+                ),
+                items: [
+                  const DropdownMenuItem<int>(value: -1, child: Text('كل المجموعات')),
+                  ..._categoryList.map(
+                    (category) => DropdownMenuItem<int>(
+                      value: category.id,
+                      child: Text(
+                        category.name + ' • ' + _difficultyLabel(category.difficulty) + ' • ' + category.wordCount.toString(),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setDialogState(() => categoryId = value == -1 ? null : value),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: groupDifficulty ?? 'all',
+                decoration: const InputDecoration(
+                  labelText: 'مستوى المجموعة',
+                  prefixIcon: Icon(Icons.speed_rounded),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('كل المستويات')),
+                  DropdownMenuItem(value: 'easy', child: Text('سهل')),
+                  DropdownMenuItem(value: 'medium', child: Text('متوسط')),
+                  DropdownMenuItem(value: 'hard', child: Text('صعب')),
+                  DropdownMenuItem(value: 'unspecified', child: Text('غير محدد')),
+                ],
+                onChanged: (value) => setDialogState(() => groupDifficulty = value == 'all' ? null : value),
+              ),
+            ],
+          ),
+          actions: [
+            if (categoryId != null) ...[
+              TextButton.icon(
+                onPressed: () async {
+                  final category = _categoryList.firstWhere((item) => item.id == categoryId);
+                  Navigator.of(dialogContext).pop();
+                  await _editDiscoveryCategory(category);
+                },
+                icon: const Icon(Icons.tune_rounded),
+                label: const Text('تعديل المجموعة'),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  final category = _categoryList.firstWhere((item) => item.id == categoryId);
+                  Navigator.of(dialogContext).pop();
+                  await _deleteDiscoveryCategory(category);
+                },
+                icon: const Icon(Icons.delete_outline_rounded, color: _red),
+                label: const Text('حذف'),
+              ),
+            ],
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                if (!mounted) return;
+                await _speech.stop();
+                _selectedCategoryId = categoryId;
+                _selectedGroupDifficulty = groupDifficulty;
+                await _load(refreshCategories: false);
+              },
+              child: const Text('تطبيق'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _discoveryFilterButton() {
+    final active = _selectedCategoryId != null || _selectedGroupDifficulty != null;
+    return IconButton(
+      onPressed: _showDiscoveryFilters,
+      tooltip: active ? 'تغيير فلترة الاكتشاف' : 'فلترة الاكتشاف',
+      icon: Icon(active ? Icons.filter_alt_rounded : Icons.filter_alt_outlined),
+    );
+  }
+
+  Widget _discoveryCategoryDraftTypeMarker() => const SizedBox.shrink();
+
+class _DiscoveryCategoryDraft {
+  const _DiscoveryCategoryDraft({required this.name, required this.difficulty});
+  final String name;
+  final String difficulty;
+}
+
+class _DiscoveryCategoryDifficultyDialog extends StatelessWidget {
+  const _DiscoveryCategoryDifficultyDialog({required this.initialDifficulty});
+  final String initialDifficulty;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DifficultyDialog(initialDifficulty: initialDifficulty);
+  }
+}
+
+class _DifficultyDialog extends StatefulWidget {
+  const _DifficultyDialog({required this.initialDifficulty});
+  final String initialDifficulty;
+
+  @override
+  State<_DifficultyDialog> createState() => _DifficultyDialogState();
+}
+
+class _DifficultyDialogState extends State<_DifficultyDialog> {
+  late String _difficulty;
+
+  @override
+  void initState() {
+    super.initState();
+    _difficulty = widget.initialDifficulty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('مستوى المجموعة', style: TextStyle(fontWeight: FontWeight.w900)),
+      content: DropdownButtonFormField<String>(
+        initialValue: _difficulty,
+        items: const [
+          DropdownMenuItem(value: 'easy', child: Text('سهل')),
+          DropdownMenuItem(value: 'medium', child: Text('متوسط')),
+          DropdownMenuItem(value: 'hard', child: Text('صعب')),
+          DropdownMenuItem(value: 'unspecified', child: Text('غير محدد')),
+        ],
+        onChanged: (value) {
+          if (value != null) setState(() => _difficulty = value);
+        },
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('إلغاء')),
+        FilledButton(onPressed: () => Navigator.of(context).pop(_difficulty), child: const Text('حفظ')),
+      ],
+    );
+  }
+}
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -256,7 +556,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           'اكتشاف الكلمات',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
-
+        actions: [_discoveryFilterButton()],
       ),
       body: SafeArea(
         child: ListView(
