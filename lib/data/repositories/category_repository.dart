@@ -117,7 +117,7 @@ class CategoryRepository {
   Future<Map<String, int>> reviewDifficultyCounts() async {
     final db = await _databaseHelper.database;
     final rows = await db.rawQuery(
-      'SELECT w.difficulty, COUNT(*) AS word_count '
+      'SELECT w.difficulty, COUNT(DISTINCT LOWER(TRIM(w.german))) AS word_count '
       'FROM words w INNER JOIN reviews r ON r.word_id=w.id '
       'GROUP BY w.difficulty',
     );
@@ -138,7 +138,10 @@ class CategoryRepository {
   Future<int> reviewCount() async {
     final db = await _databaseHelper.database;
     return Sqflite.firstIntValue(
-          await db.rawQuery('SELECT COUNT(*) FROM reviews'),
+          await db.rawQuery(
+            'SELECT COUNT(DISTINCT LOWER(TRIM(w.german))) '
+            'FROM words w INNER JOIN reviews r ON r.word_id=w.id',
+          ),
         ) ??
         0;
   }
