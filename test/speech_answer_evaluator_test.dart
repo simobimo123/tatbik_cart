@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/core/services/speech_answer_evaluator.dart';
+import 'package:deutsch_lernen/core/services/speech_answer_evaluator.dart';
 
 void main() {
   group('SpeechAnswerEvaluator', () {
