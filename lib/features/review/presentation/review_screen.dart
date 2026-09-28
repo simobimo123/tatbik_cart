@@ -1213,8 +1213,10 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
   void _scheduleAutoWordSpeech(WordModel word) {
-    final automaticKey =
-        'review-${word.id}-$_sessionStep-${_revealed ? 'revealed' : 'front'}';
+    // البطاقة نفسها يجب أن تُنطق تلقائيًا مرة واحدة فقط
+    // خلال ظهورها الحالي، سواء كانت الألمانية في الأمام
+    // أو ظهرت بعد الكشف.
+    final automaticKey = 'review-${word.id}-session-$_sessionStep';
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _isAnimating) return;
