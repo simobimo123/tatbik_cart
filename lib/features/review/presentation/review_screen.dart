@@ -842,93 +842,109 @@ class _ReviewScreenState extends State<ReviewScreen>
         germanOnFront ? TextDirection.ltr : TextDirection.rtl;
     final frontLabel = germanOnFront ? 'Deutsch' : 'الترجمة';
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 26, 24, 20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF0FF),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.style_rounded,
-              color: _primary,
-              size: 31,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            frontLabel,
-            style: const TextStyle(
-              color: Colors.black45,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          germanOnFront
-              ? _buildGermanWordDisplay(
-                  word,
-                  frontText,
-                  Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                )
-              : Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ClipRect(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: constraints.maxWidth,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      frontText,
-                      textDirection: frontDirection,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.5,
-                          ),
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF0FF),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.style_rounded,
+                        color: _primary,
+                        size: 29,
+                      ),
                     ),
-                    if (!_revealed) _buildVoiceReviewButton(word),
+                    const SizedBox(height: 12),
+                    Text(
+                      frontLabel,
+                      style: const TextStyle(
+                        color: Colors.black45,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    germanOnFront
+                        ? _buildGermanWordDisplay(
+                            word,
+                            frontText,
+                            Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.5,
+                                ),
+                          )
+                        : Column(
+                            children: [
+                              Text(
+                                frontText,
+                                textDirection: frontDirection,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .displaySmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.5,
+                                    ),
+                              ),
+                              if (!_revealed) _buildVoiceReviewButton(word),
+                            ],
+                          ),
+                    const SizedBox(height: 12),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      child: _revealed
+                          ? _buildAnswerArea(word)
+                          : const Column(
+                              children: [
+                                Text(
+                                  'اضغط على البطاقة للكشف',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                SizedBox(height: 7),
+                                Icon(
+                                  Icons.touch_app_rounded,
+                                  color: Colors.black38,
+                                  size: 25,
+                                ),
+                              ],
+                            ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '➡️ يمين: تذكرت  •  ⬅️ يسار: لم أتذكر  •  ⬇️ حذف',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.black38,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
-          const SizedBox(height: 18),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 280),
-            curve: Curves.easeOutCubic,
-            child: _revealed
-                ? _buildAnswerArea(word)
-                : const Column(
-                    children: [
-                      Text(
-                        'اضغط على البطاقة للكشف',
-                        style: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 15,
-                        ),
-                      ),
-                      SizedBox(height: 9),
-                      Icon(
-                        Icons.touch_app_rounded,
-                        color: Colors.black38,
-                        size: 27,
-                      ),
-                    ],
-                  ),
-          ),
-          const Spacer(),
-          const Text(
-            '➡️ يمين: تذكرت  •  ⬅️ يسار: لم أتذكر  •  ⬇️ أسفل: حذف',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.black38,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
+              ),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
