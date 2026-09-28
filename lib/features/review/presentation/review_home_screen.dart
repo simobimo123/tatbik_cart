@@ -133,12 +133,12 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
 
       setState(_refresh);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم حفظ التصنيف «\${draft.name.trim()}»')),
+        SnackBar(content: Text('تم حفظ التصنيف «${draft.name.trim()}»')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر حفظ التصنيف: \$e')),
+        SnackBar(content: Text('تعذر حفظ التصنيف: $e')),
       );
     }
   }
