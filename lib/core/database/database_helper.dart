@@ -8,10 +8,18 @@ class DatabaseHelper {
   static final instance = DatabaseHelper._();
 
   Database? _database;
+  Future<Database>? _databaseFuture;
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
+  Future<Database> get database {
+    final existing = _databaseFuture;
+    if (existing != null) return existing;
 
+    final future = _openDatabase();
+    _databaseFuture = future;
+    return future;
+  }
+
+  Future<Database> _openDatabase() async {
     final directory = await getDatabasesPath();
 
     _database = await openDatabase(
@@ -146,10 +154,12 @@ class DatabaseHelper {
       },
     );
 
+    // مزامنة كتالوج الكلمات مرة واحدة عند تهيئة قاعدة البيانات.
+    // الاستعلامات اللاحقة (المراجعة، الاكتشاف، الإحصاءات...) لا تعيد
+    // قراءة JSON ولا تمر على آلاف الكلمات في كل مرة.
     await _syncWordCatalog(_database!);
     return _database!;
   }
-
 
   Future<void> _deduplicateWords(Database db) async {
     // الإصدارات السابقة كانت تسمح بوجود أكثر من سجل لنفس
