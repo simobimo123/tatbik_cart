@@ -11,6 +11,7 @@ class GermanReaderScreen extends StatefulWidget {
 class _GermanReaderScreenState extends State<GermanReaderScreen> {
   static const _primary = Color(0xFF5B5FEF);
   static const _background = Color(0xFFF7F8FC);
+  static const _text = Color(0xFF171A2A);
 
   final FlutterTts _tts = FlutterTts();
   final TextEditingController _textController = TextEditingController();
@@ -39,6 +40,7 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
         if (!mounted) return;
         setState(() => _speaking = true);
       });
+
       _tts.setCompletionHandler(() {
         if (!mounted) return;
         setState(() {
@@ -46,6 +48,7 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
           _speakingKey = null;
         });
       });
+
       _tts.setCancelHandler(() {
         if (!mounted) return;
         setState(() {
@@ -53,6 +56,7 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
           _speakingKey = null;
         });
       });
+
       _tts.setErrorHandler((_) {
         if (!mounted) return;
         setState(() {
@@ -80,16 +84,11 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
   }
 
   List<String> _splitSentences(String text) {
-    final normalized = text
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-
+    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (normalized.isEmpty) return [];
 
-    final matches = RegExp(r'[^.!?]+[.!?]+|[^.!?]+$')
-        .allMatches(normalized);
-
-    return matches
+    return RegExp(r'[^.!?]+[.!?]+|[^.!?]+$')
+        .allMatches(normalized)
         .map((match) => match.group(0)!.trim())
         .where((sentence) => sentence.isNotEmpty)
         .toList();
@@ -97,27 +96,37 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
 
   List<String> _splitWords(String sentence) {
     return sentence
-        .split(RegExp(r'\\s+'))
+        .split(RegExp(r'\s+'))
         .map((word) => word.trim())
         .where((word) => word.isNotEmpty)
         .toList();
   }
 
-  Future<void> _speak(String text, String key) async {
-    final value = text.trim();
-    if (value.isEmpty || !_ready) return;
+  String _cleanWord(String word) {
+    return word
+        .replaceAll(RegExp(r'^[.,!?;:()„“”«»]+'), '')
+        .replaceAll(RegExp(r'[.,!?;:()„“”«»]+$'), '')
+        .trim();
+  }
+
+  Future<void> _speak(String value, String key) async {
+    final text = value.trim();
+    if (text.isEmpty || !_ready) return;
 
     try {
       await _tts.stop();
+
       if (!mounted) return;
       setState(() => _speakingKey = key);
-      await _tts.speak(value);
+
+      await _tts.speak(text);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _speaking = false;
         _speakingKey = null;
       });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تعذر نطق النص: $e')),
       );
@@ -126,6 +135,7 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
 
   Future<void> _stopSpeaking() async {
     await _tts.stop();
+
     if (!mounted) return;
     setState(() {
       _speaking = false;
@@ -146,8 +156,12 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
   Future<void> _clearText() async {
     await _stopSpeaking();
     if (!mounted) return;
+
     _textController.clear();
-    setState(() => _sentences = []);
+
+    setState(() {
+      _sentences = [];
+    });
   }
 
   @override
@@ -169,38 +183,18 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
         children: [
-          _buildIntro(),
+          _buildHeader(),
           const SizedBox(height: 14),
-          _buildInputCard(),
+          _buildTextInput(),
           if (_sentences.isNotEmpty) ...[
             const SizedBox(height: 22),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'النص الألماني',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${_sentences.length} جملة',
-                  style: const TextStyle(
-                    color: Colors.black45,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
+            _buildReaderHeader(),
+            const SizedBox(height: 12),
             for (var i = 0; i < _sentences.length; i++)
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: 14),
                 child: _buildSentenceCard(_sentences[i], i),
               ),
           ],
@@ -209,51 +203,59 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
     );
   }
 
-  Widget _buildIntro() {
+  Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(19),
+      padding: const EdgeInsets.fromLTRB(20, 19, 20, 20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [_primary, Color(0xFF7567F8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(27),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: const [
           BoxShadow(
             color: Color(0x225B5FEF),
-            blurRadius: 22,
-            offset: Offset(0, 9),
+            blurRadius: 24,
+            offset: Offset(0, 10),
           ),
         ],
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(
-            Icons.record_voice_over_rounded,
-            color: Colors.white,
-            size: 34,
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .16),
+              borderRadius: BorderRadius.circular(17),
+            ),
+            child: const Icon(
+              Icons.record_voice_over_rounded,
+              color: Colors.white,
+              size: 29,
+            ),
           ),
-          SizedBox(width: 13),
-          Expanded(
+          const SizedBox(width: 13),
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'اقرأ الألمانية بصوت مسموع',
+                  'القارئ الألماني',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 19,
+                    fontSize: 20,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'ضع نصًا ألمانيًا، ثم اضغط على 🔊 بجانب الجملة أو الكلمة.',
+                  'استمع إلى الجملة أو انطق أي كلمة منفردة.',
                   style: TextStyle(
                     color: Color(0xFFEDEEFF),
-                    height: 1.4,
                     fontSize: 13,
+                    height: 1.4,
                   ),
                 ),
               ],
@@ -264,72 +266,122 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
     );
   }
 
-  Widget _buildInputCard() {
+  Widget _buildTextInput() {
+    final hasText = _textController.text.trim().isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(23),
-        border: Border.all(color: const Color(0xFFE7E8F0)),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE5E7EF)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'النص الألماني',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 15,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF0FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.edit_note_rounded,
+                  color: _primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'أدخل النص الألماني',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: _text,
+                  ),
+                ),
+              ),
+              if (hasText)
+                IconButton(
+                  onPressed: _clearText,
+                  tooltip: 'مسح',
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
           ),
-          const SizedBox(height: 9),
+          const SizedBox(height: 10),
           TextField(
             controller: _textController,
             minLines: 5,
             maxLines: 9,
             textDirection: TextDirection.ltr,
             textAlign: TextAlign.left,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText:
-                  'Zum Beispiel: Ich lerne Deutsch. Heute lese ich einen kurzen Text.',
-              hintStyle: TextStyle(
+                  'Ich lerne Deutsch. Heute lese ich einen kurzen Text.',
+              hintStyle: const TextStyle(
                 color: Colors.black38,
-                height: 1.4,
+                height: 1.5,
               ),
               alignLabelWithHint: true,
+              filled: true,
+              fillColor: const Color(0xFFFAFAFC),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.all(15),
             ),
-            onChanged: (_) {
-              setState(() {
-                _sentences = [];
-              });
-            },
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 11),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _ready ? _showText : null,
-                  icon: const Icon(Icons.auto_stories_rounded),
-                  label: const Text('عرض النص'),
-                ),
-              ),
-              if (_textController.text.isNotEmpty) ...[
-                const SizedBox(width: 9),
-                IconButton(
-                  onPressed: _clearText,
-                  tooltip: 'مسح النص',
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFF0F1F6),
-                    minimumSize: const Size(54, 54),
-                  ),
-                  icon: const Icon(Icons.delete_outline_rounded),
-                ),
-              ],
-            ],
+          FilledButton.icon(
+            onPressed: _ready && hasText ? _showText : null,
+            icon: const Icon(Icons.chrome_reader_mode_rounded),
+            label: const Text('ابدأ القراءة'),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildReaderHeader() {
+    return Row(
+      children: [
+        const Expanded(
+          child: Text(
+            'النص',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: _text,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 6,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEEF0FF),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            '${_sentences.length} جملة',
+            style: const TextStyle(
+              color: _primary,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -339,139 +391,167 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
     final words = _splitWords(sentence);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 15, 12, 15),
+      padding: const EdgeInsets.fromLTRB(15, 15, 15, 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE7E8F0)),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: sentencePlaying
+              ? const Color(0xFFCBCBFF)
+              : const Color(0xFFE5E7EF),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: sentencePlaying ? .08 : .035),
+            blurRadius: sentencePlaying ? 18 : 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Directionality(
-            textDirection: TextDirection.ltr,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _speakerButton(
-                  onPressed: () => _speak(sentence, sentenceKey),
-                  active: sentencePlaying,
-                  size: 46,
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Text(
-                    sentence,
-                    textAlign: TextAlign.left,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      height: 1.55,
-                      fontWeight: FontWeight.w800,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSentenceSpeaker(sentence, sentenceKey),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F8),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Text(
+                        'Satz ${index + 1}',
+                        style: const TextStyle(
+                          color: Colors.black45,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      sentence,
+                      textDirection: TextDirection.ltr,
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        color: _text,
+                        fontSize: sentence.length > 65 ? 18 : 21,
+                        height: 1.55,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 13),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-          const Text(
-            'الكلمات',
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-              color: Colors.black45,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 13),
+            child: Divider(height: 1),
           ),
-          const SizedBox(height: 8),
-          Directionality(
-            textDirection: TextDirection.ltr,
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (var wordIndex = 0; wordIndex < words.length; wordIndex++)
-                  _buildWordChip(
-                    words[wordIndex],
-                    '$sentenceKey-word-$wordIndex',
-                  ),
-              ],
-            ),
+          const Row(
+            children: [
+              Icon(
+                Icons.record_voice_over_outlined,
+                size: 17,
+                color: Colors.black45,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'الكلمات الألمانية',
+                style: TextStyle(
+                  color: Colors.black54,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          Wrap(
+            spacing: 7,
+            runSpacing: 8,
+            children: [
+              for (var wordIndex = 0; wordIndex < words.length; wordIndex++)
+                _buildWordButton(
+                  words[wordIndex],
+                  '$sentenceKey-word-$wordIndex',
+                ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildWordChip(String word, String key) {
-    final clean = word.replaceAll(
-      RegExp(r'^[.,!?;:()\\[\\]{}„“”«»]+|[.,!?;:()\\[\\]{}„“”«»]+$'),
-      '',
-    );
-    if (clean.isEmpty) return const SizedBox.shrink();
-
-    final playing = _speakingKey == key;
+  Widget _buildSentenceSpeaker(String sentence, String key) {
+    final active = _speakingKey == key;
 
     return Material(
-      color: playing ? const Color(0xFFEAE9FF) : const Color(0xFFF3F4F8),
-      borderRadius: BorderRadius.circular(15),
+      color: active ? const Color(0xFF4649CA) : _primary,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        onTap: () => _speak(clean, key),
-        borderRadius: BorderRadius.circular(15),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 8,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                playing
-                    ? Icons.volume_up_rounded
-                    : Icons.volume_up_outlined,
-                size: 17,
-                color: _primary,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                word,
-                textDirection: TextDirection.ltr,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
-              ),
-            ],
+        onTap: () => _speak(sentence, key),
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          width: 50,
+          height: 50,
+          child: Icon(
+            active ? Icons.volume_up_rounded : Icons.volume_up_outlined,
+            color: Colors.white,
+            size: 24,
           ),
         ),
       ),
     );
   }
 
-  Widget _speakerButton({
-    required VoidCallback onPressed,
-    required bool active,
-    required double size,
-  }) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: FilledButton(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          padding: EdgeInsets.zero,
-          backgroundColor: active ? const Color(0xFF4649CA) : _primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
+  Widget _buildWordButton(String rawWord, String key) {
+    final word = _cleanWord(rawWord);
+    if (word.isEmpty) return const SizedBox.shrink();
+
+    final active = _speakingKey == key;
+
+    return Material(
+      color: active ? const Color(0xFFE9E8FF) : const Color(0xFFF4F5F8),
+      borderRadius: BorderRadius.circular(15),
+      child: InkWell(
+        onTap: () => _speak(word, key),
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(8, 7, 11, 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                active
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_up_outlined,
+                size: 16,
+                color: _primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                word,
+                textDirection: TextDirection.ltr,
+                style: const TextStyle(
+                  color: _text,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
-        ),
-        child: Icon(
-          active ? Icons.volume_up_rounded : Icons.volume_up_outlined,
-          size: size * .46,
-          color: Colors.white,
         ),
       ),
     );
