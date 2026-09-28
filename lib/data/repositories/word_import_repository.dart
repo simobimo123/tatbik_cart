@@ -33,9 +33,23 @@ class WordImportRepository {
     }
   }
 
+  String _normalizedCategoryKey(String value) => value.trim().toLowerCase();
+
   Future<WordImportResult> importJson(String content, {required WordImportTarget target}) async {
     final decoded = jsonDecode(content);
-    final dynamic rawWords = decoded is List ? decoded : decoded is Map ? decoded['words'] : null;
+    final dynamic rawWords =
+        decoded is List ? decoded : decoded is Map ? decoded['words'] : null;
+
+    final categoryDifficulties = <String, String>{};
+    if (decoded is Map && decoded['categories'] is List) {
+      for (final rawCategory in decoded['categories'] as List) {
+        if (rawCategory is! Map) continue;
+        final name = rawCategory['name']?.toString().trim() ?? '';
+        if (name.isEmpty) continue;
+        categoryDifficulties[_normalizedCategoryKey(name)] =
+            _normalizeDifficulty(rawCategory['difficulty']?.toString());
+      }
+    }
 
     if (rawWords is! List) {
       throw const FormatException('صيغة JSON غير صحيحة: يجب أن يحتوي الملف على words.');
@@ -50,6 +64,10 @@ class WordImportRepository {
       final exampleTranslation = raw['example_translation']?.toString().trim() ?? '';
       final difficulty = _normalizeDifficulty(raw['difficulty']?.toString());
       final category = raw['category']?.toString().trim() ?? '';
+      final categoryDifficulty = _normalizeDifficulty(
+        raw['category_difficulty']?.toString() ??
+            categoryDifficulties[_normalizedCategoryKey(category)],
+      );
       if (german.isEmpty || translation.isEmpty || example.isEmpty) continue;
       items.add({
         'german': german,
@@ -58,6 +76,7 @@ class WordImportRepository {
         'example_translation': exampleTranslation,
         'difficulty': difficulty,
         'category': category,
+        'category_difficulty': categoryDifficulty,
       });
     }
 
@@ -95,8 +114,11 @@ class WordImportRepository {
           if (categoryRows.isNotEmpty) {
             categoryId = categoryRows.first['id'] as int;
           } else {
+            final categoryDifficulty =
+                item['category_difficulty'] ?? 'unspecified';
             categoryId = await txn.insert('categories', {
               'name': categoryName,
+              'difficulty': categoryDifficulty,
               'created_at': DateTime.now().toIso8601String(),
             });
           }
