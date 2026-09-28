@@ -73,7 +73,7 @@ class SpeechRecognitionService {
 
       if (modelFile == null) {
         await for (final progress in manager.downloadCatalogModel(_model)) {
-          downloadProgress.value = progress.fraction;
+          downloadProgress.value = progress.fraction ?? 0;
         }
 
         modelFile = await manager.findCatalogModel(_model);
