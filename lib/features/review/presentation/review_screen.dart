@@ -498,7 +498,9 @@ class _ReviewScreenState extends State<ReviewScreen>
         // نحتفظ بموعد داخلي حتى تمر كل البطاقات الموجودة
         // حاليًا قبل أن تعود هذه البطاقة.
         _queue.add(word);
-        final cardsBeforeEnd = _queue.length - 1;
+        // "نهاية الحزمة" عندك تعني: إذا كان حجم الحزمة 30،
+        // تعود البطاقة في الموضع 31، أي بعد مرور 30 بطاقة أخرى.
+        final cardsBeforeEnd = _queue.length;
         _sessionReturnAtStep[word.id] = _sessionStep + cardsBeforeEnd;
       } else {
         final delay = remembered
