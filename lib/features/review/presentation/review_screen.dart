@@ -41,6 +41,7 @@ class _ReviewScreenState extends State<ReviewScreen>
   Timer? _voiceTimer;
   bool _voiceFinishing = false;
   bool _voicePointerHeld = false;
+  int? _voiceWordId;
   bool _suppressCardTap = false;
   String? _voiceTranscript;
   bool? _voiceCorrect;
@@ -86,6 +87,7 @@ class _ReviewScreenState extends State<ReviewScreen>
   Future<void> _load({required bool resetSession}) async {
     _voiceTimer?.cancel();
     _voicePointerHeld = false;
+    _voiceWordId = null;
     _suppressCardTap = false;
     await _voiceRecognition.cancelListening();
     _voiceTranscript = null;
@@ -199,25 +201,46 @@ class _ReviewScreenState extends State<ReviewScreen>
     _voiceFinishing = true;
     if (mounted) setState(() {});
 
+    final attemptWordId = word.id;
+    _voiceWordId = attemptWordId;
+
     try {
       final result = await _voiceRecognition.stopListening();
+
+      // Whisper يعمل بشكل غير متزامن. قد تتغير البطاقة أثناء
+      // انتظار النتيجة، لذلك لا نسمح لنتيجة محاولة قديمة بأن
+      // تظهر على بطاقة أخرى.
+      if (!mounted ||
+          _voiceWordId != attemptWordId ||
+          _queue.isEmpty ||
+          _queue.first.id != attemptWordId ||
+          _isAnimating) {
+        if (_voiceWordId == attemptWordId) {
+          _voiceFinishing = false;
+          _voiceWordId = null;
+        }
+        return;
+      }
+
       final transcript = result.text.trim();
       final correct = SpeechAnswerEvaluator.matches(
         transcript,
         word.german,
       );
 
-      if (!mounted) return;
-
       setState(() {
         _voiceTranscript = transcript;
         _voiceCorrect = correct;
         _revealed = true;
         _voiceFinishing = false;
+        _voiceWordId = null;
       });
     } catch (e) {
       if (!mounted) return;
       _voiceFinishing = false;
+      if (_voiceWordId == attemptWordId) {
+        _voiceWordId = null;
+      }
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تعذر تحليل التسجيل: $e')),
