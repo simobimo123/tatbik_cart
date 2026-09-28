@@ -184,7 +184,7 @@ class _ReviewScreenState extends State<ReviewScreen>
       _voiceFinishing = false;
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تحليل التسجيل: ${e}')),
+        SnackBar(content: Text('تعذر تحليل التسجيل: $e')),
       );
     }
   }
