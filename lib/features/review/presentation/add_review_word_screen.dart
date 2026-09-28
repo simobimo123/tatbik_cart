@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../data/models/category_model.dart';
-import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/word_repository.dart';
 
 class AddReviewWordScreen extends StatefulWidget {
@@ -14,16 +12,13 @@ class AddReviewWordScreen extends StatefulWidget {
 class _AddReviewWordScreenState extends State<AddReviewWordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _repository = WordRepository();
-  final _categories = CategoryRepository();
 
   final _german = TextEditingController();
   final _translation = TextEditingController();
   final _example = TextEditingController();
   final _exampleTranslation = TextEditingController();
 
-  List<CategoryModel> _categoryList = [];
   String _difficulty = 'unspecified';
-  int? _categoryId;
   bool _saving = false;
 
   @override
@@ -41,49 +36,6 @@ class _AddReviewWordScreenState extends State<AddReviewWordScreen> {
     super.dispose();
   }
 
-  Future<void> _loadCategories() async {
-    final categories = await _categories.getCategories();
-    if (!mounted) return;
-    setState(() => _categoryList = categories);
-  }
-
-  Future<void> _createCategory() async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('إضافة تصنيف'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textDirection: TextDirection.rtl,
-          decoration: const InputDecoration(labelText: 'اسم التصنيف'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                Navigator.pop(dialogContext, controller.text.trim());
-              }
-            },
-            child: const Text('إضافة'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-
-    if (name == null) return;
-    final id = await _categories.create(name);
-    await _loadCategories();
-    if (!mounted) return;
-    setState(() => _categoryId = id);
-  }
-
   Future<void> _save() async {
     if (!_formKey.currentState!.validate() || _saving) return;
 
@@ -96,7 +48,6 @@ class _AddReviewWordScreenState extends State<AddReviewWordScreen> {
         example: _example.text,
         exampleTranslation: _exampleTranslation.text,
         difficulty: _difficulty,
-        categoryId: _categoryId,
       );
 
       if (!mounted) return;
@@ -243,40 +194,6 @@ class _AddReviewWordScreenState extends State<AddReviewWordScreen> {
             onChanged: (value) {
               if (value != null) setState(() => _difficulty = value);
             },
-          ),
-          const Divider(height: 1),
-          Row(
-            children: [
-              const Icon(Icons.folder_rounded, color: Color(0xFF5B5FEF)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonFormField<int?>(
-                  initialValue: _categoryId,
-                  decoration: const InputDecoration(
-                    labelText: 'التصنيف',
-                    border: InputBorder.none,
-                  ),
-                  items: [
-                    const DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text('بدون تصنيف'),
-                    ),
-                    ..._categoryList.map(
-                      (category) => DropdownMenuItem<int?>(
-                        value: category.id,
-                        child: Text(category.name),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) => setState(() => _categoryId = value),
-                ),
-              ),
-              IconButton(
-                onPressed: _createCategory,
-                tooltip: 'إضافة تصنيف',
-                icon: const Icon(Icons.add_circle_outline_rounded),
-              ),
-            ],
           ),
         ],
       ),
