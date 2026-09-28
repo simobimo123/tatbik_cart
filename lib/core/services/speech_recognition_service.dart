@@ -126,6 +126,10 @@ class SpeechRecognitionService {
     liveText.value = '';
     _stopRequested = false;
 
+    // أثناء إنشاء مهمة Whisper لا نسمح ببدء طلب تسجيل ثانٍ،
+    // ونُبقي واجهة المراجعة في حالة انشغال حتى تصبح المهمة جاهزة.
+    state.value = SpeechRecognitionState.preparing;
+
     try {
       final startFuture = engine.transcribeMicrophone(
         options: TranscribeOptions(
