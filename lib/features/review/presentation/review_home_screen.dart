@@ -409,6 +409,19 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
     );
   }
 
+  String _difficultyLabel(String value) {
+    switch (value) {
+      case 'easy':
+        return 'سهل';
+      case 'medium':
+        return 'متوسط';
+      case 'hard':
+        return 'صعب';
+      default:
+        return 'غير محدد';
+    }
+  }
+
   Widget _categoryCard(CategoryModel category) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 9),
@@ -417,8 +430,8 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
         title: category.name,
         count: category.wordCount,
         subtitle: category.wordCount == 0
-            ? 'تصنيف فارغ — أضف إليه كلمات لاحقًا'
-            : 'كلمات المراجعة في هذا التصنيف',
+            ? 'تصنيف فارغ — أضف إليه كلمات لاحقًا • المستوى: ${_difficultyLabel(category.difficulty)}'
+            : 'كلمات المراجعة • المستوى: ${_difficultyLabel(category.difficulty)}',
         background: const Color(0xFFF0EFFF),
         onTap: () => _openSession(categoryId: category.id),
         onEdit: () => _editCategoryDifficulty(category),
