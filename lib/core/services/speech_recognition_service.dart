@@ -187,7 +187,7 @@ class SpeechRecognitionService {
       liveText.value = text;
       state.value = SpeechRecognitionState.idle;
 
-      return const SpeechRecognitionResult(
+      return SpeechRecognitionResult(
         text: text,
         language: 'de',
         languageProbability: -1,
