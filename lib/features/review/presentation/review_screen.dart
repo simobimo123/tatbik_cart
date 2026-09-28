@@ -573,57 +573,46 @@ class _ReviewScreenState extends State<ReviewScreen>
       }
     }
 
-    // إذا لم توجد بطاقة متاحة الآن، لكن توجد بطاقات مؤجلة، نختار
-    // أقرب بطاقة مؤجلة بدل إفراغ جلسة المراجعة.
-    //
-    // يحدث هذا خصوصًا عندما يكون عدد البطاقات المتبقية أقل من
-    // التأخير المطلوب (10 أو 30 بطاقة). لا توجد بطاقات أخرى يمكن
-    // عرضها لتمرير العد، لذلك نكمل بالدورة من أقرب بطاقة.
-    final targetIndex = bestDueIndex >= 0
-        ? bestDueIndex
-        : firstAvailableIndex >= 0
-            ? firstAvailableIndex
-            : earliestFutureIndex;
+    int targetIndex;
 
-    if (targetIndex < 0 || targetIndex == 0) return;
+    if (bestDueIndex >= 0) {
+      // البطاقة حان موعد عودتها داخل هذه الجلسة.
+      targetIndex = bestDueIndex;
+    } else if (firstAvailableIndex >= 0) {
+      // توجد بطاقة لم تُؤجَّل بعد، لذلك نستخدمها لتمرير العد.
+      targetIndex = firstAvailableIndex;
+    } else if (earliestFutureIndex >= 0) {
+      // جميع البطاقات مؤجلة. لا نعرض أي بطاقة قبل موعدها.
+      //
+      // إذا كان حجم الحزمة أصغر من التأخير المطلوب (10 أو 30 بطاقة)،
+      // فمن المستحيل عمليًا تمرير العدد المطلوب من بطاقات أخرى.
+      // بدل تكرار البطاقة نفسها مبكرًا، نقفز بالعداد الداخلي مباشرة
+      // إلى أقرب موعد مستحق، ثم نعرضها.
+      _sessionStep = earliestFutureStep;
+      targetIndex = earliestFutureIndex;
+    } else {
+      return;
+    }
+
+    if (targetIndex == 0) return;
 
     final word = _queue.removeAt(targetIndex);
     _queue.insert(0, word);
   }
 
   int? _findEligibleIndex() {
-    var firstAvailable = -1;
-    var earliestFutureIndex = -1;
-    var earliestFutureStep = 1 << 60;
-
     for (var i = 0; i < _queue.length; i++) {
       final dueStep = _sessionReturnAtStep[_queue[i].id];
 
-      if (dueStep == null) {
-        if (firstAvailable < 0) {
-          firstAvailable = i;
-        }
-        continue;
-      }
-
-      if (dueStep <= _sessionStep) {
+      if (dueStep == null || dueStep <= _sessionStep) {
         return i;
-      }
-
-      if (dueStep < earliestFutureStep) {
-        earliestFutureStep = dueStep;
-        earliestFutureIndex = i;
       }
     }
 
-    // لا نعرض شاشة "انتهت البطاقات" ما دامت هناك بطاقات في
-    // الجلسة. إذا كانت كلها مؤجلة ولا توجد بطاقة أخرى لتمرير
-    // العد، نكمل بأقرب بطاقة مؤجلة.
-    return firstAvailable >= 0
-        ? firstAvailable
-        : earliestFutureIndex >= 0
-            ? earliestFutureIndex
-            : null;
+    // _prepareNextCard() يعالج حالة كون جميع البطاقات مؤجلة
+    // عن طريق تقديم العداد إلى أقرب موعد مستحق، لذلك لا نعيد
+    // بطاقة مستقبلية من هنا قبل موعدها.
+    return null;
   }
 
   Future<void> _delete() async {
