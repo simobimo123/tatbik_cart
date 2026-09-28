@@ -85,7 +85,7 @@ class DiscoveryRepository {
             'FROM words w '
             'LEFT JOIN categories c ON c.id=w.category_id '
             'LEFT JOIN word_discoveries d ON d.word_id=w.id '
-            'WHERE ${filters.join(' AND ')},
+            'WHERE ${filters.join(' AND ')}',
             args,
           ),
         ) ??
@@ -125,7 +125,7 @@ class DiscoveryRepository {
             'LEFT JOIN categories c ON c.id=w.category_id '
             'LEFT JOIN word_discoveries d ON d.word_id=w.id '
             'LEFT JOIN reviews r ON r.word_id=w.id '
-            'WHERE ' + filters.join(' AND '),
+            'WHERE ${filters.join(' AND ')},
             args,
           ),
         ) ??
