@@ -43,7 +43,14 @@ class CategoryRepository {
     );
 
     if (existing.isNotEmpty) {
-      return existing.first['id'] as int;
+      final id = existing.first['id'] as int;
+      await db.update(
+        'categories',
+        {'difficulty': level},
+        where: 'id=?',
+        whereArgs: [id],
+      );
+      return id;
     }
 
     return db.insert('categories', {
