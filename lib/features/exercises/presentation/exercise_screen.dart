@@ -13,6 +13,7 @@ enum _QuestionType {
   sentenceGerman,
   completeSentence,
   findSentence,
+  audioMatch,
 }
 
 class _Question {
@@ -23,6 +24,8 @@ class _Question {
     required this.correctIndex,
     this.prompt,
     this.content,
+    this.matchingWords = const [],
+    this.matchingTranslations = const [],
   });
 
   final _QuestionType type;
@@ -31,7 +34,8 @@ class _Question {
   final int correctIndex;
   final String? prompt;
   final String? content;
-}
+  final List<WordModel> matchingWords;
+  final List<String> matchingTranslations;
 
 class ExerciseScreen extends StatefulWidget {
   const ExerciseScreen({super.key});
@@ -51,6 +55,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   int _answered = 0;
   int _streak = 0;
   int? _selected;
+  int? _selectedAudioIndex;
+  int? _wrongAudioIndex;
+  int? _wrongTranslationIndex;
+  final Map<int, int> _matchedPairs = {};
   bool _loading = true;
   int _questionGeneration = 0;
 
@@ -120,6 +128,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       ]);
     }
 
+    if (_audioMatchEligible(words).length >= 4) {
+      types.add(_QuestionType.audioMatch);
+    }
+
     switch (types[_random.nextInt(types.length)]) {
       case _QuestionType.translation:
         return _buildQuestion(
@@ -186,7 +198,50 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           word.example,
           words.map((w) => w.example),
         );
+      case _QuestionType.audioMatch:
+        return _buildAudioMatchQuestion(words);
     }
+  }
+
+  List<WordModel> _audioMatchEligible(List<WordModel> words) {
+    final result = <WordModel>[];
+    final seenGerman = <String>{};
+    final seenTranslation = <String>{};
+
+    for (final word in words) {
+      final german = word.german.trim();
+      final translation = word.translation.trim();
+
+      if (german.isEmpty || translation.isEmpty) continue;
+
+      final germanKey = german.toLowerCase();
+      final translationKey = translation.toLowerCase();
+
+      if (!seenGerman.add(germanKey)) continue;
+      if (!seenTranslation.add(translationKey)) continue;
+
+      result.add(word);
+    }
+
+    return result;
+  }
+
+  _Question _buildAudioMatchQuestion(List<WordModel> words) {
+    final eligible = _audioMatchEligible(words)..shuffle(_random);
+    final selectedWords = eligible.take(4).toList();
+    final translations =
+        selectedWords.map((word) => word.translation.trim()).toList()
+          ..shuffle(_random);
+
+    return _Question(
+      type: _QuestionType.audioMatch,
+      word: selectedWords.first,
+      options: const [],
+      correctIndex: -1,
+      prompt: 'استمع إلى الكلمات وطابق كل صوت مع ترجمته',
+      matchingWords: selectedWords,
+      matchingTranslations: translations,
+    );
   }
 
   _Question _buildQuestion(
@@ -235,8 +290,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
   void _choose(int index) {
     if (_selected != null || _currentQuestion == null) return;
+    if (_currentQuestion!.type == _QuestionType.audioMatch) return;
 
-    final correct = index == _currentQuestion!.correctIndex;
+    final question = _currentQuestion!;
+    final correct = index == question.correctIndex;
+
     setState(() {
       _selected = index;
       _answered++;
@@ -247,6 +305,8 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         _streak = 0;
       }
     });
+
+    _scheduleFeedbackSpeech(question, _questionGeneration);
   }
 
   void _next() {
@@ -258,6 +318,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     setState(() {
       _currentQuestion = question;
       _selected = null;
+      _selectedAudioIndex = null;
+      _wrongAudioIndex = null;
+      _wrongTranslationIndex = null;
+      _matchedPairs.clear();
     });
 
     _scheduleAutoQuestionSpeech(question, _questionGeneration);
@@ -267,23 +331,165 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     _Question question,
     int generation,
   ) {
-    final shouldSpeak = question.type == _QuestionType.translation ||
-        question.type == _QuestionType.sentenceTranslation;
+    String? content;
+    String key = 'exercise-question';
 
-    if (!shouldSpeak) return;
+    if (question.type == _QuestionType.audioMatch) {
+      if (question.matchingWords.isEmpty) return;
+      content = question.matchingWords.first.german;
+      key = 'exercise-audio-match-0';
+    } else if (_questionContentIsGerman(question)) {
+      content = question.content?.trim();
+    }
 
-    final content = question.content?.trim();
-    if (content == null || content.isEmpty) return;
+    if (content == null || content.trim().isEmpty) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _selected != null) return;
 
       _speech.speakGerman(
-        content,
-        activeKey: 'exercise-question',
+        content!,
+        activeKey: key,
         automaticKey: 'exercise-question-$generation',
       );
     });
+  }
+
+  void _scheduleFeedbackSpeech(_Question question, int generation) {
+    final sentence = question.word.example.trim();
+    final word = question.word.german.trim();
+    final content = sentence.isNotEmpty ? sentence : word;
+    final key = sentence.isNotEmpty
+        ? 'exercise-feedback-sentence'
+        : 'exercise-feedback-word';
+
+    if (content.isEmpty) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _selected == null) return;
+
+      _speech.speakGerman(
+        content,
+        activeKey: key,
+        automaticKey: 'exercise-feedback-$generation',
+      );
+    });
+  }
+
+  Future<void> _selectAudio(int index) async {
+    final question = _currentQuestion;
+    if (question == null ||
+        question.type != _QuestionType.audioMatch ||
+        _matchedPairs.containsKey(index)) {
+      return;
+    }
+
+    setState(() {
+      _selectedAudioIndex = index;
+      _wrongAudioIndex = null;
+      _wrongTranslationIndex = null;
+    });
+
+    await _speech.speakGerman(
+      question.matchingWords[index].german,
+      activeKey: 'exercise-audio-match-$index',
+    );
+  }
+
+  void _selectTranslation(int translationIndex) {
+    final question = _currentQuestion;
+    final audioIndex = _selectedAudioIndex;
+
+    if (question == null ||
+        question.type != _QuestionType.audioMatch ||
+        audioIndex == null ||
+        _matchedPairs.containsKey(audioIndex) ||
+        _matchedPairs.containsValue(translationIndex)) {
+      return;
+    }
+
+    final expected =
+        question.matchingWords[audioIndex].translation.trim().toLowerCase();
+    final chosen =
+        question.matchingTranslations[translationIndex].trim().toLowerCase();
+
+    if (expected == chosen) {
+      setState(() {
+        _matchedPairs[audioIndex] = translationIndex;
+        _selectedAudioIndex = null;
+        _wrongAudioIndex = null;
+        _wrongTranslationIndex = null;
+      });
+
+      if (_matchedPairs.length == question.matchingWords.length) {
+        setState(() {
+          _answered++;
+          _score++;
+          _streak++;
+        });
+        return;
+      }
+
+      _scheduleNextUnmatchedAudio(question);
+      return;
+    }
+
+    setState(() {
+      _wrongAudioIndex = audioIndex;
+      _wrongTranslationIndex = translationIndex;
+      _streak = 0;
+    });
+
+    Future.delayed(const Duration(milliseconds: 650), () {
+      if (!mounted) return;
+
+      setState(() {
+        _selectedAudioIndex = null;
+        _wrongAudioIndex = null;
+        _wrongTranslationIndex = null;
+      });
+    });
+  }
+
+  void _scheduleNextUnmatchedAudio(_Question question) {
+    int? nextIndex;
+
+    for (var i = 0; i < question.matchingWords.length; i++) {
+      if (!_matchedPairs.containsKey(i)) {
+        nextIndex = i;
+        break;
+      }
+    }
+
+    if (nextIndex == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _currentQuestion != question) return;
+
+      _speech.speakGerman(
+        question.matchingWords[nextIndex!].german,
+        activeKey: 'exercise-audio-match-$nextIndex',
+      );
+    });
+  }
+
+  String _typeName(_QuestionType type) {
+    switch (type) {
+      case _QuestionType.translation:
+        return 'معنى الكلمة';
+      case _QuestionType.germanWord:
+        return 'اختيار الكلمة';
+      case _QuestionType.sentenceTranslation:
+        return 'ترجمة الجملة';
+      case _QuestionType.sentenceGerman:
+        return 'الجملة الصحيحة';
+      case _QuestionType.completeSentence:
+        return 'إكمال الجملة';
+      case _QuestionType.findSentence:
+        return 'استخدام الكلمة';
+      case _QuestionType.audioMatch:
+        return 'استمع وطابق';
+    }
   }
 
   String _typeName(_QuestionType type) {
@@ -341,20 +547,34 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           children: [
             _hero(q),
             const SizedBox(height: 14),
-            _questionCard(q),
-            const SizedBox(height: 14),
-            ...q.options.asMap().entries.map(
-              (entry) => _option(q, entry.key, entry.value),
-            ),
-            if (_selected != null) ...[
-              const SizedBox(height: 10),
-              _feedback(q),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: _next,
-                icon: const Icon(Icons.arrow_forward_rounded),
-                label: const Text('السؤال التالي'),
+            if (q.type == _QuestionType.audioMatch) ...[
+              _audioMatchQuestion(q),
+              if (_matchedPairs.length == q.matchingWords.length) ...[
+                const SizedBox(height: 12),
+                _audioMatchComplete(),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _next,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: const Text('السؤال التالي'),
+                ),
+              ],
+            ] else ...[
+              _questionCard(q),
+              const SizedBox(height: 14),
+              ...q.options.asMap().entries.map(
+                (entry) => _option(q, entry.key, entry.value),
               ),
+              if (_selected != null) ...[
+                const SizedBox(height: 10),
+                _feedback(q),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _next,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: const Text('السؤال التالي'),
+                ),
+              ],
             ],
           ],
         ),
@@ -492,6 +712,299 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         q.type == _QuestionType.sentenceTranslation ||
         q.type == _QuestionType.completeSentence ||
         q.type == _QuestionType.findSentence;
+  }
+
+  Widget _audioMatchQuestion(_Question q) {
+    final matchedCount = _matchedPairs.length;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 18, 14, 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE6E7F0)),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'استمع إلى الصوت ثم اختر الترجمة المناسبة',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF171A2A),
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '\$matchedCount / \${q.matchingWords.length} أزواج صحيحة',
+            style: const TextStyle(
+              color: Colors.black54,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildMatchingTranslations(q)),
+              const SizedBox(width: 10),
+              Container(
+                width: 1,
+                height: 260,
+                color: const Color(0xFFE6E7F0),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: _buildMatchingAudio(q)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMatchingAudio(_Question q) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 9),
+          child: Text(
+            '🔊 الأصوات',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF171A2A),
+            ),
+          ),
+        ),
+        for (var i = 0; i < q.matchingWords.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 9),
+            child: _matchingAudioCard(q, i),
+          ),
+      ],
+    );
+  }
+
+  Widget _matchingAudioCard(_Question q, int index) {
+    final matched = _matchedPairs.containsKey(index);
+    final selected = _selectedAudioIndex == index;
+    final wrong = _wrongAudioIndex == index;
+
+    return ValueListenableBuilder<String?>(
+      valueListenable: _speech.activeKey,
+      builder: (context, activeKey, _) {
+        final speaking = activeKey == 'exercise-audio-match-$index';
+
+        final background = wrong
+            ? const Color(0xFFFFECEE)
+            : matched
+                ? const Color(0xFFE9F9F5)
+                : selected
+                    ? const Color(0xFFE9E8FF)
+                    : const Color(0xFFF7F7FB);
+
+        final border = wrong
+            ? const Color(0xFFE95D6A)
+            : matched
+                ? const Color(0xFF16A88F)
+                : selected
+                    ? const Color(0xFF5B5FEF)
+                    : const Color(0xFFE2E3EC);
+
+        return Material(
+          color: background,
+          borderRadius: BorderRadius.circular(18),
+          child: InkWell(
+            onTap: matched ? null : () => _selectAudio(index),
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 8,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: border,
+                  width: selected || wrong ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          'الصوت \${index + 1}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          matched ? 'تم الربط' : 'اضغط للاستماع',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: matched
+                                ? const Color(0xFF16A88F)
+                                : Colors.black45,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: matched ? null : () => _selectAudio(index),
+                    tooltip: 'تشغيل الصوت',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      speaking || selected
+                          ? Icons.volume_up_rounded
+                          : Icons.volume_up_outlined,
+                      color: matched
+                          ? const Color(0xFF16A88F)
+                          : const Color(0xFF5B5FEF),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMatchingTranslations(_Question q) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 9),
+          child: Text(
+            'الترجمات',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF171A2A),
+            ),
+          ),
+        ),
+        for (var i = 0; i < q.matchingTranslations.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 9),
+            child: _matchingTranslationCard(q, i),
+          ),
+      ],
+    );
+  }
+
+  Widget _matchingTranslationCard(_Question q, int index) {
+    int? matchedAudioIndex;
+
+    for (final entry in _matchedPairs.entries) {
+      if (entry.value == index) {
+        matchedAudioIndex = entry.key;
+        break;
+      }
+    }
+
+    final matched = matchedAudioIndex != null;
+    final wrong = _wrongTranslationIndex == index;
+
+    return Material(
+      color: wrong
+          ? const Color(0xFFFFECEE)
+          : matched
+              ? const Color(0xFFE9F9F5)
+              : const Color(0xFFF7F7FB),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: matched ? null : () => _selectTranslation(index),
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 64),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: wrong
+                  ? const Color(0xFFE95D6A)
+                  : matched
+                      ? const Color(0xFF16A88F)
+                      : const Color(0xFFE2E3EC),
+              width: wrong ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  q.matchingTranslations[index],
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.35,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (matched)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF16A88F),
+                  size: 19,
+                ),
+              if (wrong)
+                const Icon(
+                  Icons.close_rounded,
+                  color: Color(0xFFE95D6A),
+                  size: 19,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _audioMatchComplete() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE9F9F5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFB8E8DC)),
+      ),
+      child: const Row(
+        children: [
+          Icon(
+            Icons.celebration_rounded,
+            color: Color(0xFF16A88F),
+            size: 28,
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'أحسنت! طابقت جميع الأصوات مع الترجمات الصحيحة.',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _speechButton({
