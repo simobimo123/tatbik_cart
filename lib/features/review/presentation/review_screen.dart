@@ -559,11 +559,9 @@ class _ReviewScreenState extends State<ReviewScreen>
   void _prepareNextCard() {
     if (_queue.isEmpty) return;
 
-    var bestDueIndex = -1;
+    var bestIndex = -1;
     var bestDueStep = 1 << 60;
     var firstAvailableIndex = -1;
-    var earliestFutureIndex = -1;
-    var earliestFutureStep = 1 << 60;
 
     for (var i = 0; i < _queue.length; i++) {
       final word = _queue[i];
@@ -578,36 +576,21 @@ class _ReviewScreenState extends State<ReviewScreen>
 
       if (dueStep <= _sessionStep && dueStep < bestDueStep) {
         bestDueStep = dueStep;
-        bestDueIndex = i;
-      } else if (dueStep > _sessionStep &&
-          dueStep < earliestFutureStep) {
-        earliestFutureStep = dueStep;
-        earliestFutureIndex = i;
+        bestIndex = i;
       }
     }
 
-    int targetIndex;
+    final targetIndex = bestIndex >= 0
+        ? bestIndex
+        : firstAvailableIndex;
 
-    if (bestDueIndex >= 0) {
-      // البطاقة حان موعد عودتها داخل هذه الجلسة.
-      targetIndex = bestDueIndex;
-    } else if (firstAvailableIndex >= 0) {
-      // توجد بطاقة لم تُؤجَّل بعد، لذلك نستخدمها لتمرير العد.
-      targetIndex = firstAvailableIndex;
-    } else if (earliestFutureIndex >= 0) {
-      // جميع البطاقات مؤجلة. لا نعرض أي بطاقة قبل موعدها.
-      //
-      // إذا كان حجم الحزمة أصغر من التأخير المطلوب (10 أو 30 بطاقة)،
-      // فمن المستحيل عمليًا تمرير العدد المطلوب من بطاقات أخرى.
-      // بدل تكرار البطاقة نفسها مبكرًا، نقفز بالعداد الداخلي مباشرة
-      // إلى أقرب موعد مستحق، ثم نعرضها.
-      _sessionStep = earliestFutureStep;
-      targetIndex = earliestFutureIndex;
-    } else {
-      return;
-    }
-
-    if (targetIndex == 0) return;
+    // لا توجد بطاقة مستحقة فعليًا الآن.
+    //
+    // مهم جدًا: لا نقفز بـ _sessionStep إلى المستقبل هنا.
+    // _sessionStep يجب أن يتقدم فقط عندما يجيب المستخدم عن بطاقة
+    // أخرى فعلية. وإلا يمكن أن تعود بطاقة +10 أو +30 بعد بطاقات
+    // أقل بكثير من العدد المطلوب.
+    if (targetIndex == -1 || targetIndex == 0) return;
 
     final word = _queue.removeAt(targetIndex);
     _queue.insert(0, word);
@@ -1457,14 +1440,9 @@ class _ReviewScreenState extends State<ReviewScreen>
     final eligibleIndex = _findEligibleIndex();
 
     if (eligibleIndex == null) {
-      // حماية إضافية: لا نبقى عالقين في حالة الانتظار إذا كانت
-      // جميع البطاقات مؤجلة. ننقل العداد إلى أقرب موعد مستحق
-      // في الإطار التالي بدل ترك الشاشة بلا بطاقة.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_isAnimating && _queue.isNotEmpty) {
-          setState(_prepareNextCard);
-        }
-      });
+      // كل البطاقات الموجودة مؤجلة. لا نعيد أي بطاقة مبكرًا.
+      // سيستمر العداد فقط عندما يجيب المستخدم عن بطاقات أخرى،
+      // أو عندما تصل بطاقات مستحقة جديدة من قاعدة البيانات.
       return _buildWaitingState();
     }
 
