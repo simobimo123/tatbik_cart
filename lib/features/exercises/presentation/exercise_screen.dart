@@ -303,10 +303,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     }
   }
 
-  bool _isGerman(String value) =>
-      RegExp(r'[äöüÄÖÜß]').hasMatch(value) ||
-      value.contains(RegExp(r'\b(ich|du|er|sie|wir|ihr|der|die|das|ein|eine)\b'));
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -437,9 +433,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   }
 
   Widget _questionCard(_Question q) {
-    final rtlContent = q.type == _QuestionType.sentenceGerman ||
-        q.type == _QuestionType.translation ||
-        q.type == _QuestionType.germanWord;
+    final contentIsGerman = _questionContentIsGerman(q);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 24, 22, 26),
@@ -461,7 +455,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           ),
           const SizedBox(height: 20),
           Directionality(
-            textDirection: rtlContent ? TextDirection.rtl : TextDirection.ltr,
+            textDirection: contentIsGerman ? TextDirection.ltr : TextDirection.rtl,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
