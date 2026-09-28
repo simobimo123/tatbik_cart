@@ -38,7 +38,7 @@ class _ExportWordsScreenState extends State<ExportWordsScreen> {
 
       final result = await SharePlus.instance.share(
         ShareParams(
-          title: 'تصدير كلمات الألمانية',
+          title: 'استيراد كلمات الألمانية',
           subject: 'Deutsch Lernen - $kind',
           text: reviewOnly
               ? 'ملف كلمات المراجعة من تطبيق Deutsch Lernen'
@@ -98,7 +98,7 @@ class _ExportWordsScreenState extends State<ExportWordsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.file_download_rounded,
+                  Icons.file_upload_rounded,
                   color: Color(0xFF5B5FEF),
                   size: 31,
                 ),
@@ -123,7 +123,7 @@ class _ExportWordsScreenState extends State<ExportWordsScreen> {
           ),
           const SizedBox(height: 18),
           _option(
-            icon: Icons.file_upload_rounded,
+            icon: Icons.file_download_rounded,
             title: 'تصدير ملف JSON',
             subtitle: 'أدخل مجموعة كلمات إلى الاكتشاف أو المراجعة مباشرة',
             onTap: () async {
