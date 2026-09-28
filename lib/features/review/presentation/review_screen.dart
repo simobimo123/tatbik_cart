@@ -539,6 +539,7 @@ class _ReviewScreenState extends State<ReviewScreen>
 
       _revealed = false;
       _dragOffset = Offset.zero;
+      _dragAxis = null;
       _isAnimating = false;
       _exitAnimation = null;
 
@@ -629,9 +630,8 @@ class _ReviewScreenState extends State<ReviewScreen>
       }
     }
 
-    // _prepareNextCard() يعالج حالة كون جميع البطاقات مؤجلة
-    // عن طريق تقديم العداد إلى أقرب موعد مستحق، لذلك لا نعيد
-    // بطاقة مستقبلية من هنا قبل موعدها.
+    // إذا كانت كل البطاقات مؤجلة، فلا توجد بطاقة حالية حتى يمر
+    // العدد المطلوب من الإجابات الفعلية.
     return null;
   }
 
