@@ -17,6 +17,7 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
   final TextEditingController _textController = TextEditingController();
 
   List<String> _sentences = [];
+  int _readerGeneration = 0;
 
   @override
   void initState() {
@@ -74,7 +75,21 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
 
     setState(() {
       _sentences = sentences;
+      _readerGeneration++;
     });
+
+    if (sentences.isNotEmpty) {
+      final generation = _readerGeneration;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        _speech.speakGerman(
+          sentences.first,
+          activeKey: 'reader-sentence-0',
+          automaticKey: 'reader-$generation',
+        );
+      });
+    }
   }
 
   Future<void> _clearText() async {
@@ -317,7 +332,6 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
 
   Widget _buildSentenceCard(String sentence, int index) {
     final sentenceKey = 'sentence-$index';
-    final sentencePlaying = _speech.activeKey.value == sentenceKey;
     final words = _splitWords(sentence);
 
     return Container(
@@ -344,7 +358,16 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSentenceSpeaker(sentence, sentenceKey),
+              ValueListenableBuilder<String?>(
+                valueListenable: _speech.activeKey,
+                builder: (context, activeKey, _) {
+                  return _buildSentenceSpeaker(
+                    sentence,
+                    sentenceKey,
+                    active: activeKey == sentenceKey,
+                  );
+                },
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -424,9 +447,11 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
     );
   }
 
-  Widget _buildSentenceSpeaker(String sentence, String key) {
-    final active = _speech.activeKey.value == key;
-
+  Widget _buildSentenceSpeaker(
+    String sentence,
+    String key, {
+    required bool active,
+  }) {
     return Material(
       color: active ? const Color(0xFF4649CA) : _primary,
       borderRadius: BorderRadius.circular(16),
@@ -450,40 +475,47 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
     final word = _cleanWord(rawWord);
     if (word.isEmpty) return const SizedBox.shrink();
 
-    final active = _speakingKey == key;
+    return ValueListenableBuilder<String?>(
+      valueListenable: _speech.activeKey,
+      builder: (context, activeKey, _) {
+        final active = activeKey == key;
 
-    return Material(
-      color: active ? const Color(0xFFE9E8FF) : const Color(0xFFF4F5F8),
-      borderRadius: BorderRadius.circular(15),
-      child: InkWell(
-        onTap: () => _speak(word, key),
-        borderRadius: BorderRadius.circular(15),
-        child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(8, 7, 11, 7),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                active
-                    ? Icons.volume_up_rounded
-                    : Icons.volume_up_outlined,
-                size: 16,
-                color: _primary,
+        return Material(
+          color: active
+              ? const Color(0xFFE9E8FF)
+              : const Color(0xFFF4F5F8),
+          borderRadius: BorderRadius.circular(15),
+          child: InkWell(
+            onTap: () => _speak(word, key),
+            borderRadius: BorderRadius.circular(15),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(8, 7, 11, 7),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    active
+                        ? Icons.volume_up_rounded
+                        : Icons.volume_up_outlined,
+                    size: 16,
+                    color: _primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    word,
+                    textDirection: TextDirection.ltr,
+                    style: const TextStyle(
+                      color: _text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
-              Text(
-                word,
-                textDirection: TextDirection.ltr,
-                style: const TextStyle(
-                  color: _text,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
