@@ -180,8 +180,8 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
           ),
           IconButton(
             onPressed: _openExport,
-            tooltip: 'تصدير',
-            icon: const Icon(Icons.file_download_outlined),
+            tooltip: 'استيراد',
+            icon: const Icon(Icons.file_upload_outlined),
           ),
         ],
       ),
