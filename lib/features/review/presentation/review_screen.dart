@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import '../../../core/config/learning_config.dart';
 import '../../../data/models/word_model.dart';
 import '../../../data/repositories/review_repository.dart';
@@ -25,6 +26,7 @@ class _ReviewScreenState extends State<ReviewScreen>
     with SingleTickerProviderStateMixin {
   final _words = WordRepository();
   final _reviews = ReviewRepository();
+  final FlutterTts _tts = FlutterTts();
 
   final Map<int, int> _sessionReturnAtStep = {};
   final Map<int, int> _sessionAnswerCount = {};
@@ -38,6 +40,8 @@ class _ReviewScreenState extends State<ReviewScreen>
   bool _loading = true;
   bool _revealed = false;
   bool _isAnimating = false;
+  bool _ttsReady = false;
+  int? _speakingWordId;
 
   late final AnimationController _exitController;
   Animation<Offset>? _exitAnimation;
@@ -57,11 +61,50 @@ class _ReviewScreenState extends State<ReviewScreen>
       duration: const Duration(milliseconds: 300),
     );
 
+    _initializeTts();
     _load(resetSession: true);
+  }
+
+  Future<void> _initializeTts() async {
+    try {
+      await _tts.setLanguage('de-DE');
+      await _tts.setSpeechRate(0.45);
+      await _tts.setVolume(1.0);
+      await _tts.setPitch(1.0);
+      await _tts.setQueueMode(0);
+      await _tts.awaitSpeakCompletion(true);
+
+      if (!mounted) return;
+      setState(() => _ttsReady = true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _ttsReady = false);
+    }
+  }
+
+  Future<void> _speakGermanWord(WordModel word) async {
+    final text = word.german.trim();
+    if (text.isEmpty || !_ttsReady || _isAnimating) return;
+
+    try {
+      await _tts.stop();
+
+      if (!mounted) return;
+      setState(() => _speakingWordId = word.id);
+
+      await _tts.speak(text);
+
+      if (!mounted) return;
+      setState(() => _speakingWordId = null);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _speakingWordId = null);
+    }
   }
 
   @override
   void dispose() {
+    _tts.stop();
     _exitController.dispose();
     super.dispose();
   }
@@ -550,15 +593,35 @@ class _ReviewScreenState extends State<ReviewScreen>
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            frontText,
-            textDirection: frontDirection,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+          germanOnFront
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        frontText,
+                        textDirection: TextDirection.ltr,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildWordSpeaker(word),
+                  ],
+                )
+              : Text(
+                  frontText,
+                  textDirection: frontDirection,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
                 ),
-          ),
           const SizedBox(height: 18),
           AnimatedSize(
             duration: const Duration(milliseconds: 280),
@@ -628,15 +691,35 @@ class _ReviewScreenState extends State<ReviewScreen>
                 ),
               ),
               const SizedBox(height: 5),
-              Text(
-                answerText,
-                textDirection: answerDirection,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: _primary,
+              answerLabel == 'Deutsch'
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            answerText,
+                            textDirection: TextDirection.ltr,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: _primary,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        _buildWordSpeaker(word),
+                      ],
+                    )
+                  : Text(
+                      answerText,
+                      textDirection: answerDirection,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: _primary,
+                          ),
                     ),
-              ),
               const SizedBox(height: 9),
               Text(
                 word.example,
@@ -697,6 +780,27 @@ class _ReviewScreenState extends State<ReviewScreen>
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildWordSpeaker(WordModel word) {
+    final active = _speakingWordId == word.id;
+
+    return Material(
+      color: active ? const Color(0xFFE9E8FF) : const Color(0xFFF0F1F7),
+      borderRadius: BorderRadius.circular(15),
+      child: InkWell(
+        onTap: _ttsReady ? () => _speakGermanWord(word) : null,
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(
+            active ? Icons.volume_up_rounded : Icons.volume_up_outlined,
+            color: _primary,
+            size: 22,
+          ),
+        ),
+      ),
     );
   }
 
