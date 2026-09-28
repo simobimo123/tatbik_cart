@@ -985,13 +985,10 @@ class _ReviewScreenState extends State<ReviewScreen>
                         width: double.infinity,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onTap: (_voiceInputBusy || _suppressCardTap)
-                              ? null
-                              : _revealCard,
-                          onPanUpdate:
-                              _voiceInputBusy ? null : _handleDragUpdate,
-                          onPanEnd: _voiceInputBusy ? null : _handleDragEnd,
-                          onPanCancel: _voiceInputBusy ? null : _handleDragCancel,
+                          onTap: _revealCard,
+                          onPanUpdate: _handleDragUpdate,
+                          onPanEnd: _handleDragEnd,
+                          onPanCancel: _handleDragCancel,
                           child: Stack(
                             fit: StackFit.expand,
                             alignment: Alignment.center,
