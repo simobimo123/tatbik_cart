@@ -408,7 +408,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تشغيل الميكروفون: ${e}')),
+        SnackBar(content: Text('تعذر تشغيل الميكروفون: $e')),
       );
     }
   }
@@ -450,7 +450,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       _voiceFinishing = false;
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تحليل التسجيل: ${e}')),
+        SnackBar(content: Text('تعذر تحليل التسجيل: $e')),
       );
     }
   }
