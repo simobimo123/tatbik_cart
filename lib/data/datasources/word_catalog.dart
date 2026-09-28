@@ -9,6 +9,7 @@ class WordCatalogItem {
     required this.exampleTranslation,
     this.difficulty = 'unspecified',
     this.category,
+    this.categoryDifficulty = 'unspecified',
   });
 
   final String german;
@@ -17,6 +18,7 @@ class WordCatalogItem {
   final String exampleTranslation;
   final String difficulty;
   final String? category;
+  final String categoryDifficulty;
 }
 
 class WordCatalog {
@@ -65,6 +67,8 @@ class WordCatalog {
           item['example_translation']?.toString().trim() ?? '';
       final difficulty = _normalizeDifficulty(item['difficulty']?.toString());
       final category = item['category']?.toString().trim();
+      final categoryDifficulty =
+          _normalizeDifficulty(item['category_difficulty']?.toString());
 
       if (german.isEmpty ||
           translation.isEmpty ||
@@ -81,6 +85,7 @@ class WordCatalog {
           exampleTranslation: exampleTranslation,
           difficulty: difficulty,
           category: category == null || category.isEmpty ? null : category,
+          categoryDifficulty: categoryDifficulty,
         ),
       );
     }
