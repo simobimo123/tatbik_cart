@@ -39,7 +39,9 @@ class SpeechRecognitionService {
   WhisperEngine? _engine;
   WhisperStreamTask? _streamTask;
   StreamSubscription<WhisperStreamUpdate>? _updatesSubscription;
+  Future<WhisperStreamTask>? _startingTaskFuture;
   Future<void>? _prepareFuture;
+  bool _stopRequested = false;
 
   bool get isRecording =>
       state.value == SpeechRecognitionState.recording;
@@ -122,10 +124,10 @@ class SpeechRecognitionService {
     await cancelListening();
 
     liveText.value = '';
-    state.value = SpeechRecognitionState.recording;
+    _stopRequested = false;
 
     try {
-      final task = await engine.transcribeMicrophone(
+      final startFuture = engine.transcribeMicrophone(
         options: TranscribeOptions(
           strategy: WhisperSamplingStrategy.beamSearch,
           threads: 4,
@@ -151,6 +153,16 @@ class SpeechRecognitionService {
         ),
       );
 
+      _startingTaskFuture = startFuture;
+      final task = await startFuture;
+
+      if (!identical(_startingTaskFuture, startFuture) || _stopRequested) {
+        try {
+          await task.cancel();
+        } catch (_) {}
+        return;
+      }
+
       _streamTask = task;
       _updatesSubscription = task.updates.listen(
         (update) {
@@ -158,18 +170,55 @@ class SpeechRecognitionService {
         },
         onError: (_) {},
       );
+      state.value = SpeechRecognitionState.recording;
     } catch (_) {
-      state.value = SpeechRecognitionState.error;
-      rethrow;
+      if (!_stopRequested) {
+        state.value = SpeechRecognitionState.error;
+        rethrow;
+      }
+    } finally {
+      final activeStartFuture = _startingTaskFuture;
+      if (identical(activeStartFuture, startFuture)) {
+        _startingTaskFuture = null;
+      }
     }
   }
 
   Future<SpeechRecognitionResult> stopListening() async {
+    final starting = _startingTaskFuture;
+
+    if (_streamTask == null && starting != null) {
+      _stopRequested = true;
+      state.value = SpeechRecognitionState.processing;
+
+      try {
+        final task = await starting;
+
+        if (_streamTask == null) {
+          _streamTask = task;
+          _updatesSubscription = task.updates.listen(
+            (update) {
+              liveText.value = update.text.trim();
+            },
+            onError: (_) {},
+          );
+        }
+      } catch (_) {
+        state.value = SpeechRecognitionState.error;
+        rethrow;
+      } finally {
+        if (identical(_startingTaskFuture, starting)) {
+          _startingTaskFuture = null;
+        }
+      }
+    }
+
     final task = _streamTask;
 
     if (task == null) {
+      state.value = SpeechRecognitionState.idle;
       return SpeechRecognitionResult(
-        text: liveText.value.trim(),
+        text: '',
         language: 'de',
         languageProbability: -1,
       );
@@ -182,6 +231,7 @@ class SpeechRecognitionService {
       await _updatesSubscription?.cancel();
       _updatesSubscription = null;
       _streamTask = null;
+      _stopRequested = false;
 
       final text = result.text.trim();
       liveText.value = text;
@@ -196,14 +246,19 @@ class SpeechRecognitionService {
       await _updatesSubscription?.cancel();
       _updatesSubscription = null;
       _streamTask = null;
+      _stopRequested = false;
       state.value = SpeechRecognitionState.error;
       rethrow;
     }
   }
 
   Future<void> cancelListening() async {
+    _stopRequested = true;
+
     final task = _streamTask;
     _streamTask = null;
+
+    final starting = _startingTaskFuture;
 
     await _updatesSubscription?.cancel();
     _updatesSubscription = null;
@@ -212,6 +267,18 @@ class SpeechRecognitionService {
       try {
         await task.cancel();
       } catch (_) {}
+    }
+
+    if (starting != null) {
+      try {
+        final startingTask = await starting;
+        if (_streamTask == null) {
+          await startingTask.cancel();
+        }
+      } catch (_) {}
+      if (identical(_startingTaskFuture, starting)) {
+        _startingTaskFuture = null;
+      }
     }
 
     liveText.value = '';
