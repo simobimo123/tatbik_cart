@@ -310,11 +310,15 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     _scheduleFeedbackSpeech(question, _questionGeneration);
   }
 
-  void _next() {
+  Future<void> _next() async {
     if (_words.length < 2) return;
 
+    // Invalidate any delayed speech belonging to the previous question.
+    final nextGeneration = ++_questionGeneration;
+    await _speech.stop();
+    if (!mounted) return;
+
     final question = _makeQuestion(_words);
-    _questionGeneration++;
 
     setState(() {
       _currentQuestion = question;
@@ -325,7 +329,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       _matchedPairs.clear();
     });
 
-    _scheduleAutoQuestionSpeech(question, _questionGeneration);
+    _scheduleAutoQuestionSpeech(question, nextGeneration);
   }
 
   void _scheduleAutoQuestionSpeech(
@@ -346,7 +350,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     if (content == null || content.trim().isEmpty) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _selected != null) return;
+      if (!mounted ||
+          _selected != null ||
+          generation != _questionGeneration ||
+          _currentQuestion != question) {
+        return;
+      }
 
       _speech.speakGerman(
         content!,
@@ -367,7 +376,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     if (content.isEmpty) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _selected == null) return;
+      if (!mounted ||
+          _selected == null ||
+          generation != _questionGeneration ||
+          _currentQuestion != question) {
+        return;
+      }
 
       _speech.speakGerman(
         content,
@@ -431,7 +445,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         return;
       }
 
-      _scheduleNextUnmatchedAudio(question);
+      _scheduleNextUnmatchedAudio(
+        question,
+        _questionGeneration,
+      );
       return;
     }
 
@@ -452,7 +469,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     });
   }
 
-  void _scheduleNextUnmatchedAudio(_Question question) {
+  void _scheduleNextUnmatchedAudio(
+    _Question question,
+    int generation,
+  ) {
     int? nextIndex;
 
     for (var i = 0; i < question.matchingWords.length; i++) {
@@ -465,7 +485,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     if (nextIndex == null) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _currentQuestion != question) return;
+      if (!mounted ||
+          _currentQuestion != question ||
+          generation != _questionGeneration) {
+        return;
+      }
 
       _speech.speakGerman(
         question.matchingWords[nextIndex!].german,
@@ -694,7 +718,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   bool _questionContentIsGerman(_Question q) {
     return q.type == _QuestionType.translation ||
         q.type == _QuestionType.sentenceTranslation ||
-        q.type == _QuestionType.completeSentence ||
         q.type == _QuestionType.findSentence;
   }
 
@@ -798,66 +821,76 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                     ? const Color(0xFF5B5FEF)
                     : const Color(0xFFE2E3EC);
 
-        return Material(
-          color: background,
-          borderRadius: BorderRadius.circular(18),
-          child: InkWell(
-            onTap: matched ? null : () => _selectAudio(index),
-            borderRadius: BorderRadius.circular(18),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: border,
-                  width: selected || wrong ? 1.5 : 1,
+        return Semantics(
+          button: true,
+          label: 'تشغيل الكلمة الألمانية',
+          child: Material(
+            color: background,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              onTap: matched ? null : () => _selectAudio(index),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                constraints: const BoxConstraints(
+                  minHeight: 70,
+                  minWidth: 70,
                 ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          'الصوت \${index + 1}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: border,
+                    width: selected || wrong ? 1.7 : 1,
+                  ),
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Center(
+                      child: AnimatedScale(
+                        scale: speaking ? 1.08 : 1.0,
+                        duration: const Duration(milliseconds: 160),
+                        child: Icon(
+                          speaking
+                              ? Icons.volume_up_rounded
+                              : Icons.volume_up_outlined,
+                          color: matched
+                              ? const Color(0xFF16A88F)
+                              : const Color(0xFF5B5FEF),
+                          size: 30,
+                        ),
+                      ),
+                    ),
+                    if (matched)
+                      const PositionedDirectional(
+                        top: -6,
+                        end: -6,
+                        child: CircleAvatar(
+                          radius: 11,
+                          backgroundColor: Color(0xFF16A88F),
+                          child: Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 14,
                           ),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          matched ? 'تم الربط' : 'اضغط للاستماع',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: matched
-                                ? const Color(0xFF16A88F)
-                                : Colors.black45,
-                            fontWeight: FontWeight.w700,
+                      ),
+                    if (wrong)
+                      const PositionedDirectional(
+                        top: -6,
+                        end: -6,
+                        child: CircleAvatar(
+                          radius: 11,
+                          backgroundColor: Color(0xFFE95D6A),
+                          child: Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                            size: 14,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: matched ? null : () => _selectAudio(index),
-                    tooltip: 'تشغيل الصوت',
-                    visualDensity: VisualDensity.compact,
-                    icon: Icon(
-                      speaking || selected
-                          ? Icons.volume_up_rounded
-                          : Icons.volume_up_outlined,
-                      color: matched
-                          ? const Color(0xFF16A88F)
-                          : const Color(0xFF5B5FEF),
-                    ),
-                  ),
-                ],
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
