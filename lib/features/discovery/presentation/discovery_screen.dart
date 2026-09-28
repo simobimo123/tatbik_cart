@@ -65,7 +65,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     );
     final available = await _repository.availableCount(
       categoryId: _selectedCategoryId,
-      difficulty: _selectedDifficulty,
+      groupDifficulty: _selectedGroupDifficulty,
     );
 
     if (!mounted) return;
@@ -180,7 +180,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           'اكتشاف الكلمات',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
-        actions: [_discoveryFilterButton()],
+        actions: [
+          IconButton(
+            onPressed: _addDiscoveryCategory,
+            tooltip: 'إضافة مجموعة',
+            icon: const Icon(Icons.create_new_folder_outlined),
+          ),
+          _discoveryFilterButton(),
+        ],
       ),
       body: Center(
         child: Padding(
@@ -472,56 +479,18 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return _DifficultyDialog(initialDifficulty: initialDifficulty);
-  }
-}
-
-class _DifficultyDialog extends StatefulWidget {
-  const _DifficultyDialog({required this.initialDifficulty});
-  final String initialDifficulty;
-
-  @override
-  State<_DifficultyDialog> createState() => _DifficultyDialogState();
-}
-
-class _DifficultyDialogState extends State<_DifficultyDialog> {
-  late String _difficulty;
-
-  @override
-  void initState() {
-    super.initState();
-    _difficulty = widget.initialDifficulty;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('مستوى المجموعة', style: TextStyle(fontWeight: FontWeight.w900)),
-      content: DropdownButtonFormField<String>(
-        initialValue: _difficulty,
-        items: const [
-          DropdownMenuItem(value: 'easy', child: Text('سهل')),
-          DropdownMenuItem(value: 'medium', child: Text('متوسط')),
-          DropdownMenuItem(value: 'hard', child: Text('صعب')),
-          DropdownMenuItem(value: 'unspecified', child: Text('غير محدد')),
-        ],
-        onChanged: (value) {
-          if (value != null) setState(() => _difficulty = value);
-        },
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('إلغاء')),
-        FilledButton(onPressed: () => Navigator.of(context).pop(_difficulty), child: const Text('حفظ')),
-      ],
-    );
-  }
-}
-  @override
-  Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('اكتشاف الكلمات'),
+          actions: [
+            IconButton(
+              onPressed: _addDiscoveryCategory,
+              tooltip: 'إضافة مجموعة',
+              icon: const Icon(Icons.create_new_folder_outlined),
+            ),
+            _discoveryFilterButton(),
+          ],
         ),
         body: const Center(
           child: CircularProgressIndicator(),
@@ -845,3 +814,69 @@ class _DiscoveryCategoryDraft {
 class _DiscoveryCategoryDifficultyDialog extends StatelessWidget {
   const _DiscoveryCategoryDifficultyDialog({required this.initialDifficulty});
   final String initialDifficulty;
+
+class _DiscoveryCategoryDraft {
+  const _DiscoveryCategoryDraft({
+    required this.name,
+    required this.difficulty,
+  });
+
+  final String name;
+  final String difficulty;
+}
+
+class _DiscoveryCategoryDifficultyDialog extends StatefulWidget {
+  const _DiscoveryCategoryDifficultyDialog({
+    required this.initialDifficulty,
+  });
+
+  final String initialDifficulty;
+
+  @override
+  State<_DiscoveryCategoryDifficultyDialog> createState() =>
+      _DiscoveryCategoryDifficultyDialogState();
+}
+
+class _DiscoveryCategoryDifficultyDialogState
+    extends State<_DiscoveryCategoryDifficultyDialog> {
+  late String _difficulty;
+
+  @override
+  void initState() {
+    super.initState();
+    _difficulty = widget.initialDifficulty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'مستوى المجموعة',
+        style: TextStyle(fontWeight: FontWeight.w900),
+      ),
+      content: DropdownButtonFormField<String>(
+        initialValue: _difficulty,
+        items: const [
+          DropdownMenuItem(value: 'easy', child: Text('سهل')),
+          DropdownMenuItem(value: 'medium', child: Text('متوسط')),
+          DropdownMenuItem(value: 'hard', child: Text('صعب')),
+          DropdownMenuItem(value: 'unspecified', child: Text('غير محدد')),
+        ],
+        onChanged: (value) {
+          if (value != null) setState(() => _difficulty = value);
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_difficulty),
+          child: const Text('حفظ'),
+        ),
+      ],
+    );
+  }
+}
+
