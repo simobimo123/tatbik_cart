@@ -13,8 +13,10 @@ class CategoryRepository {
     final rows = await db.rawQuery(
       'SELECT c.id, c.name, c.difficulty, c.created_at, COUNT(w.id) AS word_count '
       'FROM categories c '
-      'LEFT JOIN (words w INNER JOIN reviews r ON r.word_id=w.id) '
-      'ON w.category_id=c.id '
+      'LEFT JOIN words w '
+      'ON w.category_id=c.id AND w.builtin=1 '
+      'LEFT JOIN reviews r ON r.word_id=w.id '
+      'WHERE r.word_id IS NULL '
       'GROUP BY c.id '
       'ORDER BY c.name COLLATE NOCASE ASC, c.id ASC',
     );
