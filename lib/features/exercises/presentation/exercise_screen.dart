@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,8 @@ import 'package:flutter/material.dart';
 import '../../../data/models/word_model.dart';
 import '../../../data/repositories/word_repository.dart';
 import '../../../core/services/speech_service.dart';
+import '../../../core/services/speech_answer_evaluator.dart';
+import '../../../core/services/speech_recognition_service.dart';
 
 enum _QuestionType {
   translation,
@@ -14,6 +17,9 @@ enum _QuestionType {
   completeSentence,
   findSentence,
   audioMatch,
+  speakWord,
+  speakSentence,
+  repeatAudio,
 }
 
 class _Question {
@@ -26,6 +32,7 @@ class _Question {
     this.content,
     this.matchingWords = const [],
     this.matchingTranslations = const [],
+    this.voiceTarget,
   });
 
   final _QuestionType type;
@@ -36,6 +43,7 @@ class _Question {
   final String? content;
   final List<WordModel> matchingWords;
   final List<String> matchingTranslations;
+  final String? voiceTarget;
 }
 
 class ExerciseScreen extends StatefulWidget {
@@ -51,7 +59,14 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   final _repository = WordRepository();
   final _random = Random();
   final _speech = SpeechService.instance;
+  final _voiceRecognition = SpeechRecognitionService.instance;
   final int _speechSessionId = ++_speechSessionCounter;
+
+  Timer? _voiceTimer;
+  bool _voiceFinishing = false;
+  bool _voiceAnswered = false;
+  String? _voiceTranscript;
+  bool? _voiceCorrect;
 
   List<WordModel> _words = [];
   _Question? _currentQuestion;
@@ -75,6 +90,8 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
   @override
   void dispose() {
+    _voiceTimer?.cancel();
+    _voiceRecognition.cancelListening();
     _speech.stop();
     super.dispose();
   }
@@ -135,6 +152,15 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     if (_audioMatchEligible(words).length >= 4) {
       types.add(_QuestionType.audioMatch);
     }
+
+    types.add(_QuestionType.speakWord);
+
+    if (word.example.trim().isNotEmpty &&
+        word.exampleTranslation.trim().isNotEmpty) {
+      types.add(_QuestionType.speakSentence);
+    }
+
+    types.add(_QuestionType.repeatAudio);
 
     switch (types[_random.nextInt(types.length)]) {
       case _QuestionType.translation:
@@ -204,6 +230,35 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         );
       case _QuestionType.audioMatch:
         return _buildAudioMatchQuestion(words);
+      case _QuestionType.speakWord:
+        return _Question(
+          type: _QuestionType.speakWord,
+          word: word,
+          options: const [],
+          correctIndex: -1,
+          prompt: 'قل الترجمة بالألمانية',
+          content: word.translation,
+          voiceTarget: word.german,
+        );
+      case _QuestionType.speakSentence:
+        return _Question(
+          type: _QuestionType.speakSentence,
+          word: word,
+          options: const [],
+          correctIndex: -1,
+          prompt: 'قل الجملة بالألمانية التي تعني:',
+          content: word.exampleTranslation,
+          voiceTarget: word.example,
+        );
+      case _QuestionType.repeatAudio:
+        return _Question(
+          type: _QuestionType.repeatAudio,
+          word: word,
+          options: const [],
+          correctIndex: -1,
+          prompt: 'استمع ثم كرر ما سمعته بالألمانية',
+          voiceTarget: word.german,
+        );
     }
   }
 
@@ -292,6 +347,366 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     return sentence.replaceFirst(pattern, '_____');
   }
 
+
+  bool _isVoiceQuestion(_Question question) {
+    return question.type == _QuestionType.speakWord ||
+        question.type == _QuestionType.speakSentence ||
+        question.type == _QuestionType.repeatAudio;
+  }
+
+  Future<void> _speakVoicePrompt(_Question question) async {
+    final target = question.voiceTarget?.trim();
+    if (target == null || target.isEmpty) return;
+
+    await _speech.speakGerman(
+      target,
+      activeKey: 'exercise-voice-prompt',
+    );
+  }
+
+  Future<void> _startVoiceQuestion(_Question question) async {
+    if (_voiceFinishing || _voiceAnswered) return;
+
+    if (_voiceRecognition.isRecording) {
+      await _finishVoiceQuestion(question);
+      return;
+    }
+
+    await _speech.stop();
+    _voiceTimer?.cancel();
+
+    if (mounted) {
+      setState(() {
+        _voiceTranscript = null;
+        _voiceCorrect = null;
+      });
+    }
+
+    try {
+      await _voiceRecognition.startListening(
+        initialPrompt: 'Kurze deutsche Antwort. Nur Deutsch.',
+      );
+
+      if (!mounted) return;
+
+      setState(() {});
+      final seconds =
+          question.type == _QuestionType.speakSentence ? 10 : 6;
+
+      _voiceTimer = Timer(
+        Duration(seconds: seconds),
+        () => _finishVoiceQuestion(question),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تشغيل الميكروفون: ${e}')),
+      );
+    }
+  }
+
+  Future<void> _finishVoiceQuestion(_Question question) async {
+    if (_voiceFinishing || !_voiceRecognition.isRecording) return;
+
+    _voiceTimer?.cancel();
+    _voiceFinishing = true;
+    if (mounted) setState(() {});
+
+    try {
+      final result = await _voiceRecognition.stopListening();
+      final transcript = result.text.trim();
+      final target = question.voiceTarget?.trim() ?? '';
+      final correct = SpeechAnswerEvaluator.matches(
+        transcript,
+        target,
+        sentence: question.type == _QuestionType.speakSentence,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _voiceTranscript = transcript;
+        _voiceCorrect = correct;
+        _voiceAnswered = true;
+        _voiceFinishing = false;
+        _answered++;
+        if (correct) {
+          _score++;
+          _streak++;
+        } else {
+          _streak = 0;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _voiceFinishing = false;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحليل التسجيل: ${e}')),
+      );
+    }
+  }
+
+  Widget _voiceQuestionCard(_Question question) {
+    final recording =
+        _voiceRecognition.state.value == SpeechRecognitionState.recording;
+    final preparing =
+        _voiceRecognition.state.value == SpeechRecognitionState.preparing;
+    final processing =
+        _voiceRecognition.state.value == SpeechRecognitionState.processing;
+    final error =
+        _voiceRecognition.state.value == SpeechRecognitionState.error;
+
+    final isAudioPrompt = question.type == _QuestionType.repeatAudio;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(27),
+        border: Border.all(color: const Color(0xFFE6E7F0)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            question.prompt ?? '',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.black54,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 18),
+          if (isAudioPrompt)
+            ValueListenableBuilder<String?>(
+              valueListenable: _speech.activeKey,
+              builder: (context, activeKey, _) {
+                final active = activeKey == 'exercise-voice-prompt';
+                return FilledButton.icon(
+                  onPressed: _voiceAnswered || recording || preparing ||
+                          processing || _voiceFinishing
+                      ? null
+                      : () => _speakVoicePrompt(question),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(58),
+                  ),
+                  icon: Icon(
+                    active ? Icons.volume_up_rounded : Icons.headphones_rounded,
+                  ),
+                  label: Text(active ? 'جاري التشغيل...' : 'استمع إلى النطق'),
+                );
+              },
+            )
+          else
+            Directionality(
+              textDirection: TextDirection.rtl,
+              child: Text(
+                question.content ?? '',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 28,
+                  height: 1.45,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF171A2A),
+                ),
+              ),
+            ),
+          const SizedBox(height: 16),
+          ValueListenableBuilder<SpeechRecognitionState>(
+            valueListenable: _voiceRecognition.state,
+            builder: (context, state, _) {
+              final recording = state == SpeechRecognitionState.recording;
+              final busy = state == SpeechRecognitionState.preparing ||
+                  state == SpeechRecognitionState.processing ||
+                  _voiceFinishing;
+
+              final title = busy
+                  ? state == SpeechRecognitionState.preparing
+                      ? 'تهيئة التعرف على الألمانية'
+                      : 'تحليل إجابتك...'
+                  : recording
+                      ? 'جاري التسجيل — اضغط للإيقاف'
+                      : error
+                          ? 'إعادة محاولة الميكروفون'
+                          : '🎙️ ابدأ الإجابة';
+
+              final icon = recording
+                  ? Icons.stop_rounded
+                  : busy
+                      ? Icons.hourglass_top_rounded
+                      : Icons.mic_rounded;
+
+              return Column(
+                children: [
+                  FilledButton.icon(
+                    onPressed: _voiceAnswered || busy
+                        ? null
+                        : () => _startVoiceQuestion(question),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(54),
+                      backgroundColor:
+                          recording ? const Color(0xFFE45757) : null,
+                    ),
+                    icon: Icon(icon),
+                    label: Text(title),
+                  ),
+                  if (state == SpeechRecognitionState.preparing)
+                    ValueListenableBuilder<double>(
+                      valueListenable: _voiceRecognition.downloadProgress,
+                      builder: (context, progress, _) {
+                        if (progress <= 0) {
+                          return const SizedBox.shrink();
+                        }
+
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 9),
+                          child: Column(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: LinearProgressIndicator(
+                                  value: progress.clamp(0.0, 1.0),
+                                  minHeight: 6,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${(progress * 100).round()}%',
+                                style: const TextStyle(
+                                  color: Colors.black45,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              );
+            },
+          ),
+          if (recording)
+            ValueListenableBuilder<String>(
+              valueListenable: _voiceRecognition.liveText,
+              builder: (context, text, _) => Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F1F7),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  text.trim().isEmpty
+                      ? 'تحدث بالألمانية الآن...'
+                      : text,
+                  textDirection: TextDirection.ltr,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _voiceFeedback(_Question question) {
+    final transcript = _voiceTranscript?.trim() ?? '';
+    final correct = _voiceCorrect == true;
+    final target = question.voiceTarget?.trim() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: correct
+            ? const Color(0xFFE9F9F5)
+            : const Color(0xFFFFECEE),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: correct
+              ? const Color(0xFFB8E8DC)
+              : const Color(0xFFF0B9C0),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                correct
+                    ? Icons.check_circle_rounded
+                    : Icons.cancel_rounded,
+                color: correct
+                    ? const Color(0xFF16A88F)
+                    : const Color(0xFFE45757),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                correct ? 'إجابة صوتية صحيحة' : 'إجابة صوتية غير صحيحة',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          if (transcript.isNotEmpty) ...[
+            const SizedBox(height: 11),
+            const Text(
+              'ما فهمه النظام',
+              style: TextStyle(
+                color: Colors.black45,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              transcript,
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                height: 1.4,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          const Text(
+            'الإجابة الصحيحة',
+            style: TextStyle(
+              color: Colors.black45,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            target,
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF5B5FEF),
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _choose(int index) {
     if (_selected != null || _currentQuestion == null) return;
     if (_currentQuestion!.type == _QuestionType.audioMatch) return;
@@ -330,6 +745,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       _wrongAudioIndex = null;
       _wrongTranslationIndex = null;
       _matchedPairs.clear();
+      _voiceTimer?.cancel();
+      _voiceFinishing = false;
+      _voiceAnswered = false;
+      _voiceTranscript = null;
+      _voiceCorrect = null;
     });
 
     _scheduleAutoQuestionSpeech(question, nextGeneration);
@@ -341,7 +761,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   ) {
     // The audio-matching exercise is intentionally silent until
     // the learner presses one of the audio cards.
-    if (question.type == _QuestionType.audioMatch) return;
+    if (question.type == _QuestionType.audioMatch ||
+        _isVoiceQuestion(question)) {
+      return;
+    }
 
     final content = question.content?.trim();
     if (content == null ||
@@ -489,6 +912,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         return 'استخدام الكلمة';
       case _QuestionType.audioMatch:
         return 'استمع وطابق';
+      case _QuestionType.speakWord:
+        return 'ترجمة بصوتك';
+      case _QuestionType.speakSentence:
+        return 'تحدث بالجملة';
+      case _QuestionType.repeatAudio:
+        return 'استمع وكرر';
     }
   }
 
@@ -535,6 +964,17 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
               if (_matchedPairs.length == q.matchingWords.length) ...[
                 const SizedBox(height: 12),
                 _audioMatchComplete(),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _next,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: const Text('السؤال التالي'),
+                ),
+              ],
+            ] else if (_isVoiceQuestion(q)) ...[
+              _voiceQuestionCard(q),
+              if (_voiceAnswered) ...[
+                _voiceFeedback(q),
                 const SizedBox(height: 12),
                 FilledButton.icon(
                   onPressed: _next,
