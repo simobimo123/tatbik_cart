@@ -94,7 +94,7 @@ class ReviewHomeScreen extends StatelessWidget {
                       ),
                       SizedBox(height: 5),
                       Text(
-                        'راجع جميع الكلمات المستحقة وفق نظام التكرار، بدون تقسيم حسب المجموعة أو المستوى.',
+                        'راجع كلماتك الموجودة في المراجعة بترتيب عشوائي.',
                         style: TextStyle(
                           color: Color(0xFFEDEEFF),
                           fontSize: 13,
@@ -112,7 +112,7 @@ class ReviewHomeScreen extends StatelessWidget {
             context,
             icon: Icons.play_arrow_rounded,
             title: 'ابدأ المراجعة',
-            subtitle: 'الكلمات المستحقة الآن وفق نظام التكرار داخل جلسة المراجعة',
+            subtitle: 'جميع كلمات المراجعة بترتيب عشوائي',
             background: const Color(0xFFE9F9F5),
             onTap: () => _openSession(context),
           ),
