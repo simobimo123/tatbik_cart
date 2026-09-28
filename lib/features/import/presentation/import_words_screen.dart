@@ -140,7 +140,7 @@ class _ImportWordsScreenState extends State<ImportWordsScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'الصيغة: german + translation + example + example_translation',
+            'الصيغة: german + translation + example + example_translation + difficulty + category + category_difficulty',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.black45, fontSize: 12),
           ),
