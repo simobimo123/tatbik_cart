@@ -82,12 +82,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     });
 
     if (word != null) {
-      final automaticKey = 'discovery-' + _displayGeneration.toString() + '-' + word.id.toString();
+      final automaticKey = 'discovery-${_displayGeneration}-${word.id}';
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _busy) return;
         _speech.speakGerman(
           word.german,
-          activeKey: 'discovery-word-' + word.id.toString(),
+          activeKey: 'discovery-word-${word.id}',
           automaticKey: automaticKey,
         );
       });
@@ -310,14 +310,17 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     if (!mounted || draft == null) return;
 
     try {
-      final id = await _categories.create(draft.name, difficulty: draft.difficulty);
+      final id = await _categories.create(
+        draft.name,
+        difficulty: draft.difficulty,
+      );
       _categoryList = await _categories.getCategories();
       _selectedCategoryId = id;
       if (mounted) await _load(refreshCategories: false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر حفظ المجموعة: ' + e.toString())),
+        SnackBar(content: Text('تعذر حفظ المجموعة: $e')),
       );
     }
   }
@@ -337,7 +340,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تحديث المجموعة: ' + e.toString())),
+        SnackBar(content: Text('تعذر تحديث المجموعة: $e')),
       );
     }
   }
@@ -371,7 +374,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر حذف المجموعة: ' + e.toString())),
+        SnackBar(content: Text('تعذر حذف المجموعة: $e')),
       );
     }
   }
@@ -469,7 +472,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   }
 
   Widget _discoveryFilterButton() {
-    final active = _selectedCategoryId != null || _selectedGroupDifficulty != null;
+    final active =
+        _selectedCategoryId != null || _selectedGroupDifficulty != null;
     return IconButton(
       onPressed: _showDiscoveryFilters,
       tooltip: active ? 'تغيير فلترة الاكتشاف' : 'فلترة الاكتشاف',
