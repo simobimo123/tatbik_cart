@@ -37,13 +37,13 @@ class SpeechService {
       });
 
       _tts.setCancelHandler(() {
-        _isSpeaking = false;
-        _activeKey = null;
+        speaking.value = false;
+        activeKey.value = null;
       });
 
       _tts.setErrorHandler((_) {
-        _isSpeaking = false;
-        _activeKey = null;
+        speaking.value = false;
+        activeKey.value = null;
       });
 
       // Use an installed German voice when the platform exposes one.
@@ -117,12 +117,12 @@ class SpeechService {
       final result = await _tts.speak(value);
 
       if (result is num && result == 0) {
-        _isSpeaking = false;
-        _activeKey = null;
+        speaking.value = false;
+        activeKey.value = null;
       }
     } catch (_) {
-      _isSpeaking = false;
-      _activeKey = null;
+      speaking.value = false;
+      activeKey.value = null;
     }
   }
 
