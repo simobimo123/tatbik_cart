@@ -73,8 +73,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
         actions: [
           IconButton(
             onPressed: _openExport,
-            tooltip: 'تصدير الكلمات',
-            icon: const Icon(Icons.file_download_outlined),
+            tooltip: 'استيراد الكلمات',
+            icon: const Icon(Icons.file_upload_outlined),
           ),
           const SizedBox(width: 6),
         ],
