@@ -36,6 +36,7 @@ class _Question {
   final String? content;
   final List<WordModel> matchingWords;
   final List<String> matchingTranslations;
+}
 
 class ExerciseScreen extends StatefulWidget {
   const ExerciseScreen({super.key});
