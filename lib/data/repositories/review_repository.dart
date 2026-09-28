@@ -54,7 +54,7 @@ class ReviewRepository {
             .add(
               remembered
                   ? Duration(days: days)
-                  : const Duration(minutes: 10),
+                  : const Duration.zero,
             )
             .toIso8601String(),
       },
