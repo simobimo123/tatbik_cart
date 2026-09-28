@@ -11,7 +11,7 @@ class CategoryRepository {
   Future<List<CategoryModel>> getCategories() async {
     final db = await _databaseHelper.database;
     final rows = await db.rawQuery(
-      'SELECT c.id, c.name, c.created_at, COUNT(w.id) AS word_count '
+      'SELECT c.id, c.name, c.difficulty, c.created_at, COUNT(w.id) AS word_count '
       'FROM categories c '
       'LEFT JOIN (words w INNER JOIN reviews r ON r.word_id=w.id) '
       'ON w.category_id=c.id '
@@ -21,11 +21,17 @@ class CategoryRepository {
     return rows.map(CategoryModel.fromMap).toList();
   }
 
-  Future<int> create(String name) async {
+  Future<int> create(
+    String name, {
+    String difficulty = 'unspecified',
+  }) async {
     final clean = name.trim();
     if (clean.isEmpty) {
       throw const FormatException('اسم التصنيف لا يمكن أن يكون فارغًا.');
     }
+
+    const valid = {'easy', 'medium', 'hard', 'unspecified'};
+    final level = valid.contains(difficulty) ? difficulty : 'unspecified';
 
     final db = await _databaseHelper.database;
     final existing = await db.query(
@@ -42,8 +48,22 @@ class CategoryRepository {
 
     return db.insert('categories', {
       'name': clean,
+      'difficulty': level,
       'created_at': DateTime.now().toIso8601String(),
     });
+  }
+
+  Future<void> updateDifficulty(int id, String difficulty) async {
+    const valid = {'easy', 'medium', 'hard', 'unspecified'};
+    final level = valid.contains(difficulty) ? difficulty : 'unspecified';
+
+    final db = await _databaseHelper.database;
+    await db.update(
+      'categories',
+      {'difficulty': level},
+      where: 'id=?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> delete(int id) async {
