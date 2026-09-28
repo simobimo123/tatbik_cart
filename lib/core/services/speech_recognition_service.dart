@@ -60,7 +60,7 @@ class SpeechRecognitionService {
             _prepareFuture = null;
           }
         },
-        onError: (Object _, StackTrace __) {
+        onError: (Object error, StackTrace stackTrace) {
           if (identical(_prepareFuture, future)) {
             _prepareFuture = null;
           }
