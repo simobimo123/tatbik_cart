@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
+import '../../core/services/speech_service.dart';
 
 class GermanReaderScreen extends StatefulWidget {
   const GermanReaderScreen({super.key});
@@ -13,72 +13,20 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
   static const _background = Color(0xFFF7F8FC);
   static const _text = Color(0xFF171A2A);
 
-  final FlutterTts _tts = FlutterTts();
+  final _speech = SpeechService.instance;
   final TextEditingController _textController = TextEditingController();
 
   List<String> _sentences = [];
-  bool _ready = false;
-  bool _speaking = false;
-  String? _speakingKey;
 
   @override
   void initState() {
     super.initState();
-    _initializeTts();
-  }
-
-  Future<void> _initializeTts() async {
-    try {
-      await _tts.setLanguage('de-DE');
-      await _tts.setSpeechRate(0.45);
-      await _tts.setVolume(1.0);
-      await _tts.setPitch(1.0);
-      await _tts.setQueueMode(0);
-      await _tts.awaitSpeakCompletion(true);
-
-      _tts.setStartHandler(() {
-        if (!mounted) return;
-        setState(() => _speaking = true);
-      });
-
-      _tts.setCompletionHandler(() {
-        if (!mounted) return;
-        setState(() {
-          _speaking = false;
-          _speakingKey = null;
-        });
-      });
-
-      _tts.setCancelHandler(() {
-        if (!mounted) return;
-        setState(() {
-          _speaking = false;
-          _speakingKey = null;
-        });
-      });
-
-      _tts.setErrorHandler((_) {
-        if (!mounted) return;
-        setState(() {
-          _speaking = false;
-          _speakingKey = null;
-        });
-      });
-
-      if (!mounted) return;
-      setState(() => _ready = true);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _ready = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تهيئة النطق الألماني: $e')),
-      );
-    }
+    _speech.initialize();
   }
 
   @override
   void dispose() {
-    _tts.stop();
+    _speech.stop();
     _textController.dispose();
     super.dispose();
   }
@@ -110,37 +58,14 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
   }
 
   Future<void> _speak(String value, String key) async {
-    final text = value.trim();
-    if (text.isEmpty || !_ready) return;
-
-    try {
-      await _tts.stop();
-
-      if (!mounted) return;
-      setState(() => _speakingKey = key);
-
-      await _tts.speak(text);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _speaking = false;
-        _speakingKey = null;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر نطق النص: $e')),
-      );
-    }
+    await _speech.speakGerman(
+      value,
+      activeKey: key,
+    );
   }
 
   Future<void> _stopSpeaking() async {
-    await _tts.stop();
-
-    if (!mounted) return;
-    setState(() {
-      _speaking = false;
-      _speakingKey = null;
-    });
+    await _speech.stop();
   }
 
   void _showText() {
@@ -149,7 +74,6 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
 
     setState(() {
       _sentences = sentences;
-      _speakingKey = null;
     });
   }
 
@@ -174,12 +98,18 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
         actions: [
-          if (_speaking)
-            IconButton(
-              onPressed: _stopSpeaking,
-              tooltip: 'إيقاف الصوت',
-              icon: const Icon(Icons.stop_circle_outlined),
-            ),
+          ValueListenableBuilder<bool>(
+            valueListenable: _speech.speaking,
+            builder: (context, speaking, _) {
+              if (!speaking) return const SizedBox.shrink();
+
+              return IconButton(
+                onPressed: _stopSpeaking,
+                tooltip: 'إيقاف الصوت',
+                icon: const Icon(Icons.stop_circle_outlined),
+              );
+            },
+          ),
         ],
       ),
       body: ListView(
@@ -387,7 +317,7 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
 
   Widget _buildSentenceCard(String sentence, int index) {
     final sentenceKey = 'sentence-$index';
-    final sentencePlaying = _speakingKey == sentenceKey;
+    final sentencePlaying = _speech.activeKey.value == sentenceKey;
     final words = _splitWords(sentence);
 
     return Container(
@@ -495,7 +425,7 @@ class _GermanReaderScreenState extends State<GermanReaderScreen> {
   }
 
   Widget _buildSentenceSpeaker(String sentence, String key) {
-    final active = _speakingKey == key;
+    final active = _speech.activeKey.value == key;
 
     return Material(
       color: active ? const Color(0xFF4649CA) : _primary,
