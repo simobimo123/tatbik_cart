@@ -160,7 +160,7 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تحديث مستوى التصنيف: \$e')),
+        SnackBar(content: Text('تعذر تحديث مستوى التصنيف: $e')),
       );
     }
   }
