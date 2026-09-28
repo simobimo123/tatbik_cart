@@ -12,9 +12,7 @@ class SpeechAnswerEvaluator {
     if (actual.isEmpty || target.isEmpty) return false;
     if (actual == target) return true;
 
-    if (!sentence && _wordEquivalent(actual, target)) {
-      return true;
-    }
+    if (!sentence) return false;
 
     final distance = _levenshtein(actual, target);
     final maxLength = actual.length > target.length ? actual.length : target.length;
@@ -62,21 +60,6 @@ class SpeechAnswerEvaluator {
         .toList();
 
     return words.join(' ');
-  }
-
-  static bool _wordEquivalent(String actual, String target) {
-    if (actual == target) return true;
-
-    final distance = _levenshtein(actual, target);
-    if (target.length <= 4) {
-      return distance <= 1;
-    }
-
-    if (target.length <= 8) {
-      return distance <= 1;
-    }
-
-    return distance <= 2;
   }
 
   static double _wordOverlap(
