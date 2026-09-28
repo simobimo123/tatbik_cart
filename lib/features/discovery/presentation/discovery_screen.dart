@@ -804,17 +804,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     );
   }
 }
-
-class _DiscoveryCategoryDraft {
-  const _DiscoveryCategoryDraft({required this.name, required this.difficulty});
-  final String name;
-  final String difficulty;
-}
-
-class _DiscoveryCategoryDifficultyDialog extends StatelessWidget {
-  const _DiscoveryCategoryDifficultyDialog({required this.initialDifficulty});
-  final String initialDifficulty;
-
 class _DiscoveryCategoryDraft {
   const _DiscoveryCategoryDraft({
     required this.name,
@@ -879,4 +868,3 @@ class _DiscoveryCategoryDifficultyDialogState
     );
   }
 }
-
