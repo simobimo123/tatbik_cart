@@ -33,7 +33,7 @@ class _ImportWordsScreenState extends State<ImportWordsScreen> {
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('اكتمل الاستيراد', style: TextStyle(fontWeight: FontWeight.w800)),
+          title: const Text('اكتمل التصدير', style: TextStyle(fontWeight: FontWeight.w800)),
           content: Text(
             'الملف: ${file.name}\n\n'
             'العناصر الصالحة: ${result.total}\n'
@@ -54,7 +54,7 @@ class _ImportWordsScreenState extends State<ImportWordsScreen> {
     } catch (e) {
       if (!mounted) return;
       await _showError(
-        'تعذر الاستيراد',
+        'تعذر التصدير',
         'حدث خطأ أثناء قراءة الملف:\n\n$e',
       );
     } finally {
@@ -95,7 +95,7 @@ class _ImportWordsScreenState extends State<ImportWordsScreen> {
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.file_upload_rounded, color: Color(0xFF5B5FEF), size: 32),
+                Icon(Icons.file_download_rounded, color: Color(0xFF5B5FEF), size: 32),
                 SizedBox(height: 12),
                 Text('استيراد ملف الكلمات', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                 SizedBox(height: 7),
