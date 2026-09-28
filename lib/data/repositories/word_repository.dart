@@ -70,6 +70,38 @@ class WordRepository {
   }
 
 
+  Future<void> addToReview({
+    required String german,
+    required String translation,
+    required String example,
+    required String exampleTranslation,
+    String difficulty = 'unspecified',
+  }) async {
+    final db = await _databaseHelper.database;
+    final now = DateTime.now().toIso8601String();
+
+    await db.transaction((txn) async {
+      final wordId = await txn.insert('words', {
+        'german': german.trim(),
+        'translation': translation.trim(),
+        'example': example.trim(),
+        'example_translation': exampleTranslation.trim(),
+        'difficulty': difficulty,
+        'category_id': null,
+        'builtin': 0,
+        'created_at': now,
+      });
+
+      await txn.insert('reviews', {
+        'word_id': wordId,
+        'interval_days': 0,
+        'ease': 2.5,
+        'repetitions': 0,
+        'due_at': now,
+      });
+    });
+  }
+
   Future<List<WordModel>> reviewWords() async {
     final db = await _databaseHelper.database;
 
