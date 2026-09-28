@@ -53,11 +53,18 @@ class SpeechRecognitionService {
     final future = _prepare();
     _prepareFuture = future;
 
-    future.whenComplete(() {
-      if (identical(_prepareFuture, future)) {
-        _prepareFuture = null;
-      }
-    });
+    future.then(
+      (_) {
+        if (identical(_prepareFuture, future)) {
+          _prepareFuture = null;
+        }
+      },
+      onError: (Object _, StackTrace __) {
+        if (identical(_prepareFuture, future)) {
+          _prepareFuture = null;
+        }
+      },
+    );
 
     return future;
   }
@@ -178,10 +185,10 @@ class SpeechRecognitionService {
       liveText.value = text;
       state.value = SpeechRecognitionState.idle;
 
-      return SpeechRecognitionResult(
+      return const SpeechRecognitionResult(
         text: text,
-        language: result.language,
-        languageProbability: result.languageProbability,
+        language: 'de',
+        languageProbability: -1,
       );
     } catch (_) {
       await _updatesSubscription?.cancel();
