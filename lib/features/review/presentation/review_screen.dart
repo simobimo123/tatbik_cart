@@ -1,15 +1,11 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../../../core/config/learning_config.dart';
 import '../../../data/models/word_model.dart';
 import '../../../data/repositories/review_repository.dart';
 import '../../../data/repositories/word_repository.dart';
 import 'add_review_word_screen.dart';
 import '../../export/presentation/export_words_screen.dart';
 import '../../../core/services/speech_service.dart';
-import '../../../core/services/speech_answer_evaluator.dart';
-import '../../../core/services/speech_recognition_service.dart';
 
 class ReviewScreen extends StatefulWidget {
   const ReviewScreen({super.key});
@@ -23,28 +19,17 @@ class _ReviewScreenState extends State<ReviewScreen>
   final _words = WordRepository();
   final _reviews = ReviewRepository();
   final _speech = SpeechService.instance;
-  final _voiceRecognition = SpeechRecognitionService.instance;
 
-  final Map<int, int> _sessionReturnAtStep = {};
-  final Map<int, int> _sessionAnswerCount = {};
   final Map<int, bool> _germanFront = {};
   final Random _random = Random();
 
   List<WordModel> _queue = [];
-  int _sessionStep = 0;
   int _sessionAnswered = 0;
 
   bool _loading = true;
   bool _revealed = false;
   bool _isAnimating = false;
 
-  Timer? _voiceTimer;
-  bool _voiceFinishing = false;
-  bool _voicePointerHeld = false;
-  int? _voiceWordId;
-  bool _suppressCardTap = false;
-  String? _voiceTranscript;
-  bool? _voiceCorrect;
 
   late final AnimationController _exitController;
   Animation<Offset>? _exitAnimation;
@@ -67,16 +52,12 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     _speech.initialize();
 
-    // نجهّز Whisper مسبقًا حتى لا ينتظر المستخدم تهيئة النموذج عند أول ضغطة.
-    unawaited(_voiceRecognition.prepare());
 
     _load(resetSession: true);
   }
 
   @override
   void dispose() {
-    _voiceTimer?.cancel();
-    _voiceRecognition.cancelListening();
     _speech.stop();
     _exitController.dispose();
     super.dispose();
@@ -86,24 +67,15 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
   Future<void> _load({required bool resetSession}) async {
-    _voiceTimer?.cancel();
-    _voicePointerHeld = false;
-    _voiceWordId = null;
-    _suppressCardTap = false;
-    await _voiceRecognition.cancelListening();
-    _voiceTranscript = null;
-    _voiceCorrect = null;
-    _voiceFinishing = false;
 
     if (mounted) {
       setState(() {
         _loading = true;
-        _voiceTranscript = null;
-        _voiceCorrect = null;
       });
     }
 
-    final queue = await _words.dueWords(limit: 300);
+    final queue = await _words.reviewWords();
+    queue.shuffle(_random);
 
     if (!mounted) return;
 
@@ -114,13 +86,8 @@ class _ReviewScreenState extends State<ReviewScreen>
       _dragOffset = Offset.zero;
 
       if (resetSession) {
-        _sessionReturnAtStep.clear();
-        _sessionAnswerCount.clear();
-        _sessionStep = 0;
         _sessionAnswered = 0;
       }
-
-      _prepareNextCard();
     });
   }
 
@@ -129,424 +96,32 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
 
-  Future<void> _beginVoiceAnswer(WordModel word) async {
-    if (_isAnimating ||
-        _voiceFinishing ||
-        _voiceRecognition.state.value == SpeechRecognitionState.preparing ||
-        _voiceRecognition.state.value == SpeechRecognitionState.processing) {
-      return;
-    }
-
-    if (_voiceRecognition.isRecording) return;
-
-    await _speech.stop();
-    _voiceTimer?.cancel();
-
-    if (mounted) {
-      setState(() {
-        _voiceTranscript = null;
-        _voiceCorrect = null;
-      });
-    }
-
-    try {
-      await _voiceRecognition.startListening(
-        initialPrompt: 'Kurze deutsche Antwort. Nur Deutsch.',
-      );
-
-      if (!mounted) return;
-
-      // إذا رفع المستخدم إصبعه أثناء تهيئة Whisper، أوقف التسجيل
-      // فور بدء المحرك بدل أن يستمر في الخلفية.
-      if (!_voicePointerHeld) {
-        await _finishVoiceAnswer(word);
-        return;
-      }
-
-      setState(() {});
-
-      // حماية فقط إذا ضاعت إشارة رفع الإصبع.
-      _voiceTimer = Timer(
-        const Duration(seconds: 30),
-        () => _finishVoiceAnswer(word),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تشغيل الميكروفون: $e')),
-      );
-    }
-  }
-
-  Future<void> _endVoiceAnswer(WordModel word) async {
-    _voicePointerHeld = false;
-
-    if (!_voiceRecognition.isRecording || _voiceFinishing) return;
-    await _finishVoiceAnswer(word);
-  }
-
-  void _releaseVoicePointer() {
-    _voicePointerHeld = false;
-
-    Future<void>.delayed(const Duration(milliseconds: 180), () {
-      if (mounted) {
-        setState(() => _suppressCardTap = false);
-      }
-    });
-  }
-
-  Future<void> _finishVoiceAnswer(WordModel word) async {
-    if (_voiceFinishing || !_voiceRecognition.isRecording) return;
-
-    _voiceTimer?.cancel();
-    _voiceFinishing = true;
-    if (mounted) setState(() {});
-
-    final attemptWordId = word.id;
-    _voiceWordId = attemptWordId;
-
-    try {
-      final result = await _voiceRecognition.stopListening();
-
-      // Whisper يعمل بشكل غير متزامن. قد تتغير البطاقة أثناء
-      // انتظار النتيجة، لذلك لا نسمح لنتيجة محاولة قديمة بأن
-      // تظهر على بطاقة أخرى.
-      if (!mounted ||
-          _voiceWordId != attemptWordId ||
-          _queue.isEmpty ||
-          _queue.first.id != attemptWordId ||
-          _isAnimating) {
-        if (_voiceWordId == attemptWordId) {
-          _voiceFinishing = false;
-          _voiceWordId = null;
-        }
-        return;
-      }
-
-      final transcript = result.text.trim();
-      final correct = SpeechAnswerEvaluator.matches(
-        transcript,
-        word.german,
-      );
-
-      setState(() {
-        _voiceTranscript = transcript;
-        _voiceCorrect = correct;
-        _revealed = true;
-        _voiceFinishing = false;
-        _voiceWordId = null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      _voiceFinishing = false;
-      if (_voiceWordId == attemptWordId) {
-        _voiceWordId = null;
-      }
-      setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تحليل التسجيل: $e')),
-      );
-    }
-  }
-
-  Widget _buildVoiceReviewButton(WordModel word) {
-    return ValueListenableBuilder<SpeechRecognitionState>(
-      valueListenable: _voiceRecognition.state,
-      builder: (context, state, _) {
-        final recording = state == SpeechRecognitionState.recording;
-        final processing = state == SpeechRecognitionState.processing;
-        final preparing = state == SpeechRecognitionState.preparing;
-        final error = state == SpeechRecognitionState.error;
-
-        final title = preparing
-            ? 'تهيئة التعرف على الألمانية...'
-            : recording
-                ? 'اترك الزر لإيقاف التسجيل'
-                : processing || _voiceFinishing
-                    ? 'تحليل إجابتك...'
-                    : error
-                        ? 'إعادة محاولة الميكروفون'
-                        : _voiceTranscript != null
-                            ? 'اضغط مطولًا للمحاولة مرة أخرى'
-                            : 'اضغط مطولًا وتحدث بالألمانية';
-
-        final icon = recording
-            ? Icons.mic_rounded
-            : processing || preparing || _voiceFinishing
-                ? Icons.hourglass_top_rounded
-                : Icons.mic_none_rounded;
-
-        final disabled = preparing || processing || _voiceFinishing;
-
-        return Column(
-          children: [
-            const SizedBox(height: 12),
-            ValueListenableBuilder<double>(
-              valueListenable: _voiceRecognition.downloadProgress,
-              builder: (context, progress, _) {
-                final showProgress = preparing && progress > 0;
-
-                final button = FilledButton.icon(
-                  onPressed: disabled ? null : () {},
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(54),
-                    backgroundColor: recording ? _red : _primary,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFFBFC2D9),
-                    disabledForegroundColor: Colors.white,
-                  ),
-                  icon: Icon(icon),
-                  label: Text(title),
-                );
-
-                return Column(
-                  children: [
-                    Listener(
-                      behavior: HitTestBehavior.opaque,
-                      onPointerDown: disabled
-                          ? null
-                          : (_) {
-                              _voicePointerHeld = true;
-                              _suppressCardTap = true;
-                              _beginVoiceAnswer(word);
-                            },
-                      onPointerUp: disabled
-                          ? null
-                          : (_) {
-                              _endVoiceAnswer(word);
-                              _releaseVoicePointer();
-                            },
-                      onPointerCancel: disabled
-                          ? null
-                          : (_) {
-                              _endVoiceAnswer(word);
-                              _releaseVoicePointer();
-                            },
-                      child: button,
-                    ),
-                    if (showProgress) ...[
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: progress.clamp(0.0, 1.0).toDouble(),
-                          minHeight: 6,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${(progress * 100).round()}%',
-                        style: const TextStyle(
-                          color: Colors.black45,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-              },
-            ),
-            if (recording)
-              ValueListenableBuilder<String>(
-                valueListenable: _voiceRecognition.liveText,
-                builder: (context, text, _) {
-                  if (text.trim().isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text(
-                        'تحدث بالألمانية الآن...',
-                        style: TextStyle(
-                          color: Colors.black45,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    );
-                  }
-
-                  return Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(top: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 13,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0F1F7),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(
-                      text,
-                      textDirection: TextDirection.ltr,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        height: 1.4,
-                      ),
-                    ),
-                  );
-                },
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildVoiceResult(WordModel word) {
-    final transcript = _voiceTranscript?.trim();
-    if (transcript == null) return const SizedBox.shrink();
-
-    final correct = _voiceCorrect == true;
-    final empty = transcript.isEmpty;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: correct
-            ? const Color(0xFFE9F9F5)
-            : const Color(0xFFFFECEE),
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(
-          color: correct
-              ? const Color(0xFFB8E8DC)
-              : const Color(0xFFF0B9C0),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                correct
-                    ? Icons.check_circle_rounded
-                    : Icons.cancel_rounded,
-                color: correct ? _green : _red,
-              ),
-              const SizedBox(width: 7),
-              Text(
-                empty
-                    ? 'لم يتم التعرف على الكلام'
-                    : correct
-                        ? 'إجابة صوتية صحيحة'
-                        : 'إجابة صوتية غير صحيحة',
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ],
-          ),
-          if (!empty) ...[
-            const SizedBox(height: 10),
-            const Text(
-              'سمعنا',
-              style: TextStyle(
-                color: Colors.black45,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              transcript,
-              textDirection: TextDirection.ltr,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                height: 1.4,
-              ),
-            ),
-          ],
-          const SizedBox(height: 9),
-          const Text(
-            'الإجابة الصحيحة',
-            style: TextStyle(
-              color: Colors.black45,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            word.german,
-            textDirection: TextDirection.ltr,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: _primary,
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _answer(bool remembered) async {
     if (_isAnimating || _queue.isEmpty) return;
 
     final word = _queue.first;
-    final answerCount = _sessionAnswerCount[word.id] ?? 0;
-    final hasBeenAnsweredBefore = answerCount > 0;
-
     final direction =
         remembered ? const Offset(500, 40) : const Offset(-500, 40);
 
-    // أوقف كل صوت مرتبط بالبطاقة القديمة قبل بدء انتقالها،
-    // حتى لا يستمر TTS أثناء ظهور البطاقة التالية.
-    _voiceTimer?.cancel();
-    _voiceTranscript = null;
-    _voiceCorrect = null;
-    _voiceWordId = null;
     await _speech.stop();
-
     setState(() => _isAnimating = true);
 
     final saveFuture = _reviews.review(word.id, remembered);
-
     await _animateCardExit(direction);
 
     if (!mounted) return;
 
     setState(() {
+      // لا تعاد البطاقة داخل الجلسة الحالية.
+      // يتم خلط البطاقات المتبقية حتى تكون البطاقة التالية عشوائية.
       _queue.removeAt(0);
-
-      // كل إجابة ناجحة في هذه الجلسة تمثل بطاقة أخرى ظهرت.
-      _sessionStep++;
+      _queue.shuffle(_random);
       _sessionAnswered++;
-
-      _sessionAnswerCount[word.id] = answerCount + 1;
-
-      if (remembered && hasBeenAnsweredBefore) {
-        // بعد أن يعرفها المستخدم للمرة الثانية:
-        // تُنقل إلى نهاية الحزمة الحالية، ولا تعود مباشرة.
-        // نحتفظ بموعد داخلي حتى تمر كل البطاقات الموجودة
-        // حاليًا قبل أن تعود هذه البطاقة.
-        _queue.add(word);
-        // "نهاية الحزمة" عندك تعني: إذا كان حجم الحزمة 30،
-        // تعود البطاقة في الموضع 31، أي بعد مرور 30 بطاقة أخرى.
-        final cardsBeforeEnd = _queue.length;
-        _sessionReturnAtStep[word.id] = _sessionStep + cardsBeforeEnd;
-      } else {
-        final delay = remembered
-            ? LearningConfig.reviewRememberedDelayCards
-            : LearningConfig.reviewForgottenDelayCards;
-
-        // لا نعد البطاقة الحالية نفسها. يبدأ العد من البطاقات
-        // التي ستظهر بعدها.
-        _sessionReturnAtStep[word.id] = _sessionStep + delay;
-        _queue.add(word);
-      }
-
       _revealed = false;
       _dragOffset = Offset.zero;
       _dragAxis = null;
       _isAnimating = false;
       _exitAnimation = null;
-
-      _prepareNextCard();
     });
 
     try {
@@ -558,84 +133,6 @@ class _ReviewScreenState extends State<ReviewScreen>
         );
       }
     }
-
-    // عندما نقترب من نهاية الدفعة، نطلب بطاقات مستحقة أخرى من قاعدة
-    // البيانات حتى لا يتوقف المستخدم عند حد الدفعة 300.
-    if (mounted && _queue.length < 50) {
-      await _appendMoreDueWords();
-    }
-  }
-
-  Future<void> _appendMoreDueWords() async {
-    final more = await _words.dueWords(limit: 300);
-    if (!mounted || more.isEmpty) return;
-
-    setState(() {
-      final existingIds = _queue.map((word) => word.id).toSet();
-
-      for (final word in more) {
-        if (!existingIds.contains(word.id)) {
-          _queue.add(word);
-          existingIds.add(word.id);
-        }
-      }
-
-      _prepareNextCard();
-    });
-  }
-
-  void _prepareNextCard() {
-    if (_queue.isEmpty) return;
-
-    var bestIndex = -1;
-    var bestDueStep = 1 << 60;
-    var firstAvailableIndex = -1;
-
-    for (var i = 0; i < _queue.length; i++) {
-      final word = _queue[i];
-      final dueStep = _sessionReturnAtStep[word.id];
-
-      if (dueStep == null) {
-        if (firstAvailableIndex < 0) {
-          firstAvailableIndex = i;
-        }
-        continue;
-      }
-
-      if (dueStep <= _sessionStep && dueStep < bestDueStep) {
-        bestDueStep = dueStep;
-        bestIndex = i;
-      }
-    }
-
-    final targetIndex = bestIndex >= 0
-        ? bestIndex
-        : firstAvailableIndex;
-
-    // لا توجد بطاقة مستحقة فعليًا الآن.
-    //
-    // مهم جدًا: لا نقفز بـ _sessionStep إلى المستقبل هنا.
-    // _sessionStep يجب أن يتقدم فقط عندما يجيب المستخدم عن بطاقة
-    // أخرى فعلية. وإلا يمكن أن تعود بطاقة +10 أو +30 بعد بطاقات
-    // أقل بكثير من العدد المطلوب.
-    if (targetIndex == -1 || targetIndex == 0) return;
-
-    final word = _queue.removeAt(targetIndex);
-    _queue.insert(0, word);
-  }
-
-  int? _findEligibleIndex() {
-    for (var i = 0; i < _queue.length; i++) {
-      final dueStep = _sessionReturnAtStep[_queue[i].id];
-
-      if (dueStep == null || dueStep <= _sessionStep) {
-        return i;
-      }
-    }
-
-    // إذا كانت كل البطاقات مؤجلة، فلا توجد بطاقة حالية حتى يمر
-    // العدد المطلوب من الإجابات الفعلية.
-    return null;
   }
 
   Future<void> _delete() async {
@@ -668,9 +165,8 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     setState(() {
       _queue.removeAt(0);
-      _sessionReturnAtStep.remove(word.id);
-      _sessionAnswerCount.remove(word.id);
       _germanFront.remove(word.id);
+      _queue.shuffle(_random);
       _revealed = false;
       _dragOffset = Offset.zero;
       _dragAxis = null;
@@ -1035,7 +531,6 @@ class _ReviewScreenState extends State<ReviewScreen>
                                       letterSpacing: -0.5,
                                     ),
                               ),
-                              if (!_revealed) _buildVoiceReviewButton(word),
                             ],
                           ),
                     const SizedBox(height: 12),
@@ -1091,7 +586,6 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     return Column(
       children: [
-        if (_voiceTranscript != null) _buildVoiceResult(word),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(17),
@@ -1267,14 +761,6 @@ class _ReviewScreenState extends State<ReviewScreen>
         );
       },
     );
-  }
-
-  bool get _voiceInputBusy {
-    final state = _voiceRecognition.state.value;
-    return _voiceFinishing ||
-        state == SpeechRecognitionState.preparing ||
-        state == SpeechRecognitionState.recording ||
-        state == SpeechRecognitionState.processing;
   }
 
   Widget _buildSwipeHint() {
@@ -1506,23 +992,6 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     if (_queue.isEmpty) {
       return _buildEmptyState();
-    }
-
-    final eligibleIndex = _findEligibleIndex();
-
-    if (eligibleIndex == null) {
-      // كل البطاقات الموجودة مؤجلة. لا نعيد أي بطاقة مبكرًا.
-      // سيستمر العداد فقط عندما يجيب المستخدم عن بطاقات أخرى،
-      // أو عندما تصل بطاقات مستحقة جديدة من قاعدة البيانات.
-      return _buildWaitingState();
-    }
-
-    if (eligibleIndex != 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_isAnimating) {
-          setState(_prepareNextCard);
-        }
-      });
     }
 
     final word = _queue.first;
