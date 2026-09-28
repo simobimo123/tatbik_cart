@@ -53,17 +53,19 @@ class SpeechRecognitionService {
     final future = _prepare();
     _prepareFuture = future;
 
-    future.then(
-      (_) {
-        if (identical(_prepareFuture, future)) {
-          _prepareFuture = null;
-        }
-      },
-      onError: (Object _, StackTrace __) {
-        if (identical(_prepareFuture, future)) {
-          _prepareFuture = null;
-        }
-      },
+    unawaited(
+      future.then(
+        (_) {
+          if (identical(_prepareFuture, future)) {
+            _prepareFuture = null;
+          }
+        },
+        onError: (Object _, StackTrace __) {
+          if (identical(_prepareFuture, future)) {
+            _prepareFuture = null;
+          }
+        },
+      ),
     );
 
     return future;
