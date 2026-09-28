@@ -141,8 +141,6 @@ class _ReviewScreenState extends State<ReviewScreen>
     final word = _queue.first;
 
     await _speech.stop();
-    _voiceTimer?.cancel();
-    _voiceWordId = null;
 
     setState(() => _isAnimating = true);
 
@@ -173,7 +171,6 @@ class _ReviewScreenState extends State<ReviewScreen>
       _isAnimating = false;
       _exitAnimation = null;
 
-      _prepareNextCard();
     });
   }
 
@@ -371,7 +368,7 @@ class _ReviewScreenState extends State<ReviewScreen>
               ),
               const SizedBox(height: 20),
               const Text(
-                'لا توجد بطاقات مستحقة الآن',
+                'لا توجد كلمات في المراجعة',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 22,
@@ -380,7 +377,7 @@ class _ReviewScreenState extends State<ReviewScreen>
               ),
               const SizedBox(height: 9),
               const Text(
-                'يمكنك إضافة كلمة مباشرة إلى المراجعة أو العودة لاحقًا عند حلول موعد الكلمات التالية.',
+                'أضف كلمات إلى المراجعة، وستظهر هنا بترتيب عشوائي.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.black54,
@@ -393,70 +390,6 @@ class _ReviewScreenState extends State<ReviewScreen>
                 onPressed: _openAddWord,
                 icon: const Icon(Icons.playlist_add_rounded),
                 label: const Text('إضافة كلمة للمراجعة'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWaitingState() {
-    final delayedCount = _queue.length;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'المراجعة',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-        actions: [
-          IconButton(
-            onPressed: _openAddWord,
-            tooltip: 'إضافة كلمة للمراجعة',
-            icon: const Icon(Icons.add_rounded),
-          ),
-          IconButton(
-            onPressed: _openExport,
-            tooltip: 'تصدير الكلمات',
-            icon: const Icon(Icons.file_download_outlined),
-          ),
-        ],
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(26),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.hourglass_bottom_rounded,
-                size: 58,
-                color: _primary,
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'انتهت البطاقات المتاحة لهذه اللحظة',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 9),
-              Text(
-                '$delayedCount بطاقة ما زالت مؤجلة حتى تمر البطاقات المطلوبة قبل عودتها.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.black54,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 22),
-              FilledButton.icon(
-                onPressed: _openAddWord,
-                icon: const Icon(Icons.playlist_add_rounded),
-                label: const Text('إضافة بطاقة جديدة'),
               ),
             ],
           ),
