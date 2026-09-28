@@ -111,7 +111,7 @@ class SpeechService {
     try {
       await _tts.stop();
 
-      activeKey.value = activeKey;
+      this.activeKey.value = activeKey;
       speaking.value = true;
 
       final result = await _tts.speak(value);
