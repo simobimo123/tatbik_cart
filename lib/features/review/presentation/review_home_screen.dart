@@ -117,25 +117,50 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
   }
 
   Future<void> _addCategory() async {
-    final name = await showDialog<String>(
+    final draft = await showDialog<_CategoryDraft>(
       context: context,
-      builder: (_) => const _AddCategoryDialog(),
+      builder: (_) => const _CategoryDialog(),
     );
 
-    if (!mounted || name == null || name.trim().isEmpty) return;
+    if (!mounted || draft == null || draft.name.trim().isEmpty) return;
 
     try {
-      await _categories.create(name);
+      await _categories.create(
+        draft.name,
+        difficulty: draft.difficulty,
+      );
       if (!mounted) return;
 
       setState(_refresh);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم إنشاء التصنيف «${name.trim()}»')),
+        SnackBar(content: Text('تم حفظ التصنيف «\${draft.name.trim()}»')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر إنشاء التصنيف: $e')),
+        SnackBar(content: Text('تعذر حفظ التصنيف: \$e')),
+      );
+    }
+  }
+
+  Future<void> _editCategoryDifficulty(CategoryModel category) async {
+    final difficulty = await showDialog<String>(
+      context: context,
+      builder: (_) => _CategoryDifficultyDialog(
+        initialDifficulty: category.difficulty,
+      ),
+    );
+
+    if (!mounted || difficulty == null) return;
+
+    try {
+      await _categories.updateDifficulty(category.id, difficulty);
+      if (!mounted) return;
+      setState(_refresh);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحديث مستوى التصنيف: \$e')),
       );
     }
   }
@@ -396,6 +421,7 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
             : 'كلمات المراجعة في هذا التصنيف',
         background: const Color(0xFFF0EFFF),
         onTap: () => _openSession(categoryId: category.id),
+        onEdit: () => _editCategoryDifficulty(category),
         onDelete: () => _deleteCategory(category),
       ),
     );
@@ -404,15 +430,26 @@ class _ReviewHomeScreenState extends State<ReviewHomeScreen> {
 
 
 
-class _AddCategoryDialog extends StatefulWidget {
-  const _AddCategoryDialog();
+class _CategoryDraft {
+  const _CategoryDraft({
+    required this.name,
+    required this.difficulty,
+  });
 
-  @override
-  State<_AddCategoryDialog> createState() => _AddCategoryDialogState();
+  final String name;
+  final String difficulty;
 }
 
-class _AddCategoryDialogState extends State<_AddCategoryDialog> {
+class _CategoryDialog extends StatefulWidget {
+  const _CategoryDialog();
+
+  @override
+  State<_CategoryDialog> createState() => _CategoryDialogState();
+}
+
+class _CategoryDialogState extends State<_CategoryDialog> {
   late final TextEditingController _controller;
+  String _difficulty = 'unspecified';
 
   @override
   void initState() {
@@ -427,9 +464,15 @@ class _AddCategoryDialogState extends State<_AddCategoryDialog> {
   }
 
   void _submit() {
-    final value = _controller.text.trim();
-    if (value.isEmpty) return;
-    Navigator.of(context).pop(value);
+    final name = _controller.text.trim();
+    if (name.isEmpty) return;
+
+    Navigator.of(context).pop(
+      _CategoryDraft(
+        name: name,
+        difficulty: _difficulty,
+      ),
+    );
   }
 
   @override
@@ -439,16 +482,51 @@ class _AddCategoryDialogState extends State<_AddCategoryDialog> {
         'إضافة تصنيف جديد',
         style: TextStyle(fontWeight: FontWeight.w900),
       ),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        textDirection: TextDirection.rtl,
-        textInputAction: TextInputAction.done,
-        decoration: const InputDecoration(
-          labelText: 'اسم التصنيف',
-          hintText: 'مثال: التسوق',
-        ),
-        onSubmitted: (_) => _submit(),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            textDirection: TextDirection.rtl,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              labelText: 'اسم التصنيف',
+              hintText: 'مثال: التسوق',
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String>(
+            initialValue: _difficulty,
+            decoration: const InputDecoration(
+              labelText: 'مستوى المجموعة',
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: 'easy',
+                child: Text('سهل'),
+              ),
+              DropdownMenuItem(
+                value: 'medium',
+                child: Text('متوسط'),
+              ),
+              DropdownMenuItem(
+                value: 'hard',
+                child: Text('صعب'),
+              ),
+              DropdownMenuItem(
+                value: 'unspecified',
+                child: Text('غير محدد'),
+              ),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _difficulty = value);
+              }
+            },
+          ),
+        ],
       ),
       actions: [
         TextButton(
@@ -457,7 +535,64 @@ class _AddCategoryDialogState extends State<_AddCategoryDialog> {
         ),
         FilledButton(
           onPressed: _submit,
-          child: const Text('إضافة'),
+          child: const Text('حفظ'),
+        ),
+      ],
+    );
+  }
+}
+
+class _CategoryDifficultyDialog extends StatefulWidget {
+  const _CategoryDifficultyDialog({
+    required this.initialDifficulty,
+  });
+
+  final String initialDifficulty;
+
+  @override
+  State<_CategoryDifficultyDialog> createState() =>
+      _CategoryDifficultyDialogState();
+}
+
+class _CategoryDifficultyDialogState
+    extends State<_CategoryDifficultyDialog> {
+  late String _difficulty;
+
+  @override
+  void initState() {
+    super.initState();
+    _difficulty = widget.initialDifficulty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'مستوى المجموعة',
+        style: TextStyle(fontWeight: FontWeight.w900),
+      ),
+      content: DropdownButtonFormField<String>(
+        initialValue: _difficulty,
+        items: const [
+          DropdownMenuItem(value: 'easy', child: Text('سهل')),
+          DropdownMenuItem(value: 'medium', child: Text('متوسط')),
+          DropdownMenuItem(value: 'hard', child: Text('صعب')),
+          DropdownMenuItem(value: 'unspecified', child: Text('غير محدد')),
+        ],
+        onChanged: (value) {
+          if (value != null) {
+            setState(() => _difficulty = value);
+          }
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_difficulty),
+          child: const Text('حفظ'),
         ),
       ],
     );
@@ -494,6 +629,7 @@ class _ReviewTile extends StatelessWidget {
     required this.subtitle,
     required this.background,
     required this.onTap,
+    this.onEdit,
     this.onDelete,
   });
 
@@ -503,6 +639,7 @@ class _ReviewTile extends StatelessWidget {
   final String subtitle;
   final Color background;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   @override
@@ -550,6 +687,19 @@ class _ReviewTile extends StatelessWidget {
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
               ),
               const SizedBox(width: 5),
+              if (onEdit != null) ...[
+                IconButton(
+                  onPressed: onEdit,
+                  tooltip: 'تغيير مستوى التصنيف',
+                  icon: const Icon(
+                    Icons.tune_rounded,
+                    color: Color(0xFF5B5FEF),
+                    size: 20,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 2),
+              ],
               if (onDelete != null) ...[
                 IconButton(
                   onPressed: onDelete,
