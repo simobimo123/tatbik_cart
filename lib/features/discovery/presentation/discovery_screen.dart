@@ -82,7 +82,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     });
 
     if (word != null) {
-      final automaticKey = 'discovery-${_displayGeneration}-${word.id}';
+      final automaticKey = 'discovery-$_displayGeneration-${word.id}';
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _busy) return;
         _speech.speakGerman(
