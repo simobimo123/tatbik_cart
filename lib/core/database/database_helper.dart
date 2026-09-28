@@ -340,6 +340,10 @@ class DatabaseHelper {
 
     await db.execute('CREATE INDEX words_german ON words(german)');
     await db.execute(
+      'CREATE UNIQUE INDEX words_german_unique '
+      'ON words(LOWER(TRIM(german)))',
+    );
+    await db.execute(
       'CREATE INDEX word_discoveries_queue '
       'ON word_discoveries(known, discovery_order)',
     );
