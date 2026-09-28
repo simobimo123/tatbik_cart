@@ -50,6 +50,7 @@ class _ReviewScreenState extends State<ReviewScreen>
   Animation<Offset>? _exitAnimation;
 
   Offset _dragOffset = Offset.zero;
+  Axis? _dragAxis;
 
   static const _primary = Color(0xFF5B5FEF);
   static const _green = Color(0xFF16A88F);
@@ -696,40 +697,76 @@ class _ReviewScreenState extends State<ReviewScreen>
   void _handleDragUpdate(DragUpdateDetails details) {
     if (_isAnimating) return;
 
+    final proposed = _dragOffset + details.delta;
+
+    if (_dragAxis == null) {
+      final distance = proposed.distance;
+      if (distance < 12) return;
+
+      final horizontal = proposed.dx.abs();
+      final vertical = proposed.dy;
+
+      if (horizontal > vertical.abs() * 1.2) {
+        _dragAxis = Axis.horizontal;
+      } else if (vertical > horizontal * 1.2) {
+        _dragAxis = Axis.vertical;
+      } else {
+        return;
+      }
+    }
+
     setState(() {
-      _dragOffset += details.delta;
-      _dragOffset = Offset(
-        _dragOffset.dx.clamp(-280.0, 280.0).toDouble(),
-        _dragOffset.dy.clamp(-70.0, 220.0).toDouble(),
-      );
+      if (_dragAxis == Axis.horizontal) {
+        _dragOffset = Offset(
+          proposed.dx.clamp(-280.0, 280.0).toDouble(),
+          0,
+        );
+      } else {
+        _dragOffset = Offset(
+          0,
+          proposed.dy.clamp(0.0, 220.0).toDouble(),
+        );
+      }
     });
   }
 
   void _handleDragEnd(DragEndDetails details) {
     if (_isAnimating) return;
 
-    final velocity = details.primaryVelocity ?? 0;
     final horizontalDistance = _dragOffset.dx.abs();
     final verticalDistance = _dragOffset.dy;
 
-    if (!_revealed &&
+    if (_dragAxis == null &&
+        !_revealed &&
         horizontalDistance < 24 &&
-        verticalDistance.abs() < 24 &&
-        velocity.abs() < 120) {
+        verticalDistance < 24) {
       setState(() => _revealed = true);
       return;
     }
 
-    if (_dragOffset.dx > 190 ||
-        (_dragOffset.dx > 135 && velocity > 1400)) {
-      _answer(true);
-    } else if (_dragOffset.dx < -190 ||
-        (_dragOffset.dx < -135 && velocity < -1400)) {
-      _answer(false);
-    } else if (_dragOffset.dy > 210 &&
-        _dragOffset.dy > _dragOffset.dx.abs() * 0.95) {
+    if (_dragAxis == Axis.horizontal) {
+      if (_dragOffset.dx > 190) {
+        _answer(true);
+        return;
+      }
+
+      if (_dragOffset.dx < -190) {
+        _answer(false);
+        return;
+      }
+    } else if (_dragAxis == Axis.vertical &&
+        verticalDistance > 210) {
       _delete();
-    } else {
+      return;
+    }
+
+    _returnCardToCenter();
+  }
+
+  void _handleDragCancel() {
+    if (_isAnimating) return;
+    _dragAxis = null;
+    if (_dragOffset != Offset.zero) {
       _returnCardToCenter();
     }
   }
@@ -756,6 +793,7 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     setState(() {
       _dragOffset = Offset.zero;
+      _dragAxis = null;
       _isAnimating = false;
       _exitAnimation = null;
     });
@@ -1541,6 +1579,7 @@ class _ReviewScreenState extends State<ReviewScreen>
                           onPanUpdate:
                               _voiceInputBusy ? null : _handleDragUpdate,
                           onPanEnd: _voiceInputBusy ? null : _handleDragEnd,
+                          onPanCancel: _voiceInputBusy ? null : _handleDragCancel,
                           child: Stack(
                             fit: StackFit.expand,
                             alignment: Alignment.center,
