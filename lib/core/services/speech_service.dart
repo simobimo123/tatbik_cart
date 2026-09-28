@@ -33,17 +33,17 @@ class SpeechService {
 
       _tts.setCompletionHandler(() {
         speaking.value = false;
-        activeKey.value = null;
+        this.activeKey.value = null;
       });
 
       _tts.setCancelHandler(() {
         speaking.value = false;
-        activeKey.value = null;
+        this.activeKey.value = null;
       });
 
       _tts.setErrorHandler((_) {
         speaking.value = false;
-        activeKey.value = null;
+        this.activeKey.value = null;
       });
 
       // Use an installed German voice when the platform exposes one.
@@ -118,11 +118,11 @@ class SpeechService {
 
       if (result is num && result == 0) {
         speaking.value = false;
-        activeKey.value = null;
+        this.activeKey.value = null;
       }
     } catch (_) {
       speaking.value = false;
-      activeKey.value = null;
+      this.activeKey.value = null;
     }
   }
 
@@ -134,6 +134,6 @@ class SpeechService {
     }
 
     speaking.value = false;
-    activeKey.value = null;
+    this.activeKey.value = null;
   }
 }
