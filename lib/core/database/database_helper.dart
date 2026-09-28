@@ -16,7 +16,7 @@ class DatabaseHelper {
 
     _database = await openDatabase(
       path.join(directory, 'deutsch_lernen.db'),
-      version: 7,
+      version: 8,
       onCreate: (db, version) => _createTables(db),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -279,6 +279,16 @@ class DatabaseHelper {
             'ON words(LOWER(TRIM(german)))',
           );
         }
+        if (oldVersion < 8) {
+          // بعض الأجهزة قد تكون وصلت إلى قاعدة الإصدار 7 قبل
+          // إضافة القيد الفريد. IF NOT EXISTS يجعل الترقية آمنة
+          // في الحالتين.
+          await db.execute(
+            'CREATE UNIQUE INDEX IF NOT EXISTS words_german_unique '
+            'ON words(LOWER(TRIM(german)))',
+          );
+        }
+
       },
     );
 
