@@ -119,7 +119,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     setState(() {
       _isDragging = true;
-      _dragDx = (_dragDx + details.delta.dx).clamp(-260.0, 260.0);
+      _dragDx = (_dragDx + details.delta.dx).clamp(-260.0, 260.0).toDouble();
     });
   }
 
@@ -507,7 +507,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       return _buildEmptyState();
     }
 
-    final dragProgress = (_dragDx.abs() / 160).clamp(0.0, 1.0);
+    final dragProgress = (_dragDx.abs() / 160).clamp(0.0, 1.0).toDouble();
     final isKnownDrag = _dragDx > 0;
 
     return Scaffold(
