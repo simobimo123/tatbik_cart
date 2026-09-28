@@ -21,7 +21,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   int _available = 0;
   List<CategoryModel> _categoryList = [];
   int? _selectedCategoryId;
-  String? _selectedDifficulty;
+  String? _selectedGroupDifficulty;
   bool _loading = true;
   bool _busy = false;
   bool _showMeaning = false;
@@ -61,7 +61,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     final word = await _repository.nextWord(
       categoryId: _selectedCategoryId,
-      difficulty: _selectedDifficulty,
+      groupDifficulty: _selectedGroupDifficulty,
     );
     final available = await _repository.availableCount(
       categoryId: _selectedCategoryId,
