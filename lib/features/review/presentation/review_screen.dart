@@ -666,6 +666,7 @@ class _ReviewScreenState extends State<ReviewScreen>
       _germanFront.remove(word.id);
       _revealed = false;
       _dragOffset = Offset.zero;
+      _dragAxis = null;
       _isAnimating = false;
       _exitAnimation = null;
 
