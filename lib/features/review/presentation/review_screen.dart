@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../../core/config/learning_config.dart';
@@ -7,6 +8,8 @@ import '../../../data/repositories/word_repository.dart';
 import 'add_review_word_screen.dart';
 import '../../export/presentation/export_words_screen.dart';
 import '../../../core/services/speech_service.dart';
+import '../../../core/services/speech_answer_evaluator.dart';
+import '../../../core/services/speech_recognition_service.dart';
 
 class ReviewScreen extends StatefulWidget {
   const ReviewScreen({super.key});
@@ -20,6 +23,7 @@ class _ReviewScreenState extends State<ReviewScreen>
   final _words = WordRepository();
   final _reviews = ReviewRepository();
   final _speech = SpeechService.instance;
+  final _voiceRecognition = SpeechRecognitionService.instance;
 
   final Map<int, int> _sessionReturnAtStep = {};
   final Map<int, int> _sessionAnswerCount = {};
@@ -33,6 +37,11 @@ class _ReviewScreenState extends State<ReviewScreen>
   bool _loading = true;
   bool _revealed = false;
   bool _isAnimating = false;
+
+  Timer? _voiceTimer;
+  bool _voiceFinishing = false;
+  String? _voiceTranscript;
+  bool? _voiceCorrect;
 
   late final AnimationController _exitController;
   Animation<Offset>? _exitAnimation;
@@ -58,6 +67,8 @@ class _ReviewScreenState extends State<ReviewScreen>
 
   @override
   void dispose() {
+    _voiceTimer?.cancel();
+    _voiceRecognition.cancelListening();
     _speech.stop();
     _exitController.dispose();
     super.dispose();
@@ -67,8 +78,18 @@ class _ReviewScreenState extends State<ReviewScreen>
   }
 
   Future<void> _load({required bool resetSession}) async {
+    _voiceTimer?.cancel();
+    await _voiceRecognition.cancelListening();
+    _voiceTranscript = null;
+    _voiceCorrect = null;
+    _voiceFinishing = false;
+
     if (mounted) {
-      setState(() => _loading = true);
+      setState(() {
+        _loading = true;
+        _voiceTranscript = null;
+        _voiceCorrect = null;
+      });
     }
 
     final queue = await _words.dueWords(limit: 300);
@@ -94,6 +115,287 @@ class _ReviewScreenState extends State<ReviewScreen>
 
   Future<void> _reloadAfterAddingWord() async {
     await _load(resetSession: true);
+  }
+
+
+  Future<void> _startOrStopVoiceAnswer(WordModel word) async {
+    if (_isAnimating || _voiceFinishing) return;
+
+    if (_voiceRecognition.isRecording) {
+      await _finishVoiceAnswer(word);
+      return;
+    }
+
+    await _speech.stop();
+    _voiceTimer?.cancel();
+
+    if (mounted) {
+      setState(() {
+        _voiceTranscript = null;
+        _voiceCorrect = null;
+      });
+    }
+
+    try {
+      await _voiceRecognition.startListening(
+        initialPrompt: 'Kurze deutsche Antwort. Nur Deutsch.',
+      );
+
+      if (!mounted) return;
+
+      setState(() {});
+      _voiceTimer = Timer(
+        const Duration(seconds: 5),
+        () => _finishVoiceAnswer(word),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${e}')),
+      );
+    }
+  }
+
+  Future<void> _finishVoiceAnswer(WordModel word) async {
+    if (_voiceFinishing || !_voiceRecognition.isRecording) return;
+
+    _voiceTimer?.cancel();
+    _voiceFinishing = true;
+    if (mounted) setState(() {});
+
+    try {
+      final result = await _voiceRecognition.stopListening();
+      final transcript = result.text.trim();
+      final correct = SpeechAnswerEvaluator.matches(
+        transcript,
+        word.german,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _voiceTranscript = transcript;
+        _voiceCorrect = correct;
+        _revealed = true;
+        _voiceFinishing = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _voiceFinishing = false;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحليل التسجيل: ${e}')),
+      );
+    }
+  }
+
+  Widget _buildVoiceReviewButton(WordModel word) {
+    return ValueListenableBuilder<SpeechRecognitionState>(
+      valueListenable: _voiceRecognition.state,
+      builder: (context, state, _) {
+        final recording = state == SpeechRecognitionState.recording;
+        final processing = state == SpeechRecognitionState.processing;
+        final preparing = state == SpeechRecognitionState.preparing;
+        final error = state == SpeechRecognitionState.error;
+
+        final title = preparing
+            ? 'تهيئة التعرف على الألمانية'
+            : recording
+                ? 'جاري التسجيل — اضغط للإيقاف'
+                : processing || _voiceFinishing
+                    ? 'تحليل إجابتك...'
+                    : error
+                        ? 'إعادة محاولة الميكروفون'
+                        : _voiceTranscript != null
+                            ? 'حاول مرة أخرى'
+                            : 'قلها بالألمانية';
+
+        final icon = recording
+            ? Icons.stop_rounded
+            : processing || preparing || _voiceFinishing
+                ? Icons.hourglass_top_rounded
+                : Icons.mic_rounded;
+
+        return Column(
+          children: [
+            const SizedBox(height: 12),
+            ValueListenableBuilder<double>(
+              valueListenable: _voiceRecognition.downloadProgress,
+              builder: (context, progress, _) {
+                final showProgress = preparing && progress > 0;
+                return Column(
+                  children: [
+                    FilledButton.icon(
+                      onPressed: preparing || processing || _voiceFinishing
+                          ? null
+                          : () => _startOrStopVoiceAnswer(word),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                        backgroundColor: recording
+                            ? _red
+                            : const Color(0xFF5B5FEF),
+                      ),
+                      icon: Icon(icon),
+                      label: Text(title),
+                    ),
+                    if (showProgress) ...[
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: progress.clamp(0.0, 1.0),
+                          minHeight: 6,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${(progress * 100).round()}%',
+                        style: const TextStyle(
+                          color: Colors.black45,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+            if (recording)
+              ValueListenableBuilder<String>(
+                valueListenable: _voiceRecognition.liveText,
+                builder: (context, text, _) {
+                  if (text.trim().isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'تحدث بالألمانية الآن...',
+                        style: TextStyle(
+                          color: Colors.black45,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  }
+
+                  return Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 13,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F1F7),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      text,
+                      textDirection: TextDirection.ltr,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        height: 1.4,
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildVoiceResult(WordModel word) {
+    final transcript = _voiceTranscript?.trim();
+    if (transcript == null) return const SizedBox.shrink();
+
+    final correct = _voiceCorrect == true;
+    final empty = transcript.isEmpty;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: correct
+            ? const Color(0xFFE9F9F5)
+            : const Color(0xFFFFECEE),
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(
+          color: correct
+              ? const Color(0xFFB8E8DC)
+              : const Color(0xFFF0B9C0),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                correct
+                    ? Icons.check_circle_rounded
+                    : Icons.cancel_rounded,
+                color: correct ? _green : _red,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                empty
+                    ? 'لم يتم التعرف على الكلام'
+                    : correct
+                        ? 'إجابة صوتية صحيحة'
+                        : 'إجابة صوتية غير صحيحة',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          if (!empty) ...[
+            const SizedBox(height: 10),
+            const Text(
+              'سمعنا',
+              style: TextStyle(
+                color: Colors.black45,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              transcript,
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                height: 1.4,
+              ),
+            ),
+          ],
+          const SizedBox(height: 9),
+          const Text(
+            'الإجابة الصحيحة',
+            style: TextStyle(
+              color: Colors.black45,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            word.german,
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: _primary,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _answer(bool remembered) async {
@@ -547,14 +849,19 @@ class _ReviewScreenState extends State<ReviewScreen>
                         letterSpacing: -0.5,
                       ),
                 )
-              : Text(
-                  frontText,
-                  textDirection: frontDirection,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
+              : Column(
+                  children: [
+                    Text(
+                      frontText,
+                      textDirection: frontDirection,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                    ),
+                    if (!_revealed) _buildVoiceReviewButton(word),
+                  ],
                 ),
           const SizedBox(height: 18),
           AnimatedSize(
@@ -604,6 +911,7 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     return Column(
       children: [
+        if (_voiceTranscript != null) _buildVoiceResult(word),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(17),
