@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../data/models/word_model.dart';
 import '../../../data/repositories/word_repository.dart';
+import '../../../core/services/speech_service.dart';
 
 enum _QuestionType {
   translation,
@@ -42,6 +43,7 @@ class ExerciseScreen extends StatefulWidget {
 class _ExerciseScreenState extends State<ExerciseScreen> {
   final _repository = WordRepository();
   final _random = Random();
+  final _speech = SpeechService.instance;
 
   List<WordModel> _words = [];
   _Question? _currentQuestion;
@@ -50,11 +52,19 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   int _streak = 0;
   int? _selected;
   bool _loading = true;
+  int _questionGeneration = 0;
 
   @override
   void initState() {
     super.initState();
+    _speech.initialize();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _speech.stop();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -62,11 +72,18 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       final words = await _repository.reviewWords();
       if (!mounted) return;
 
+      final question = words.length >= 2 ? _makeQuestion(words) : null;
+
       setState(() {
         _words = words;
         _loading = false;
-        _currentQuestion = words.length >= 2 ? _makeQuestion(words) : null;
+        _currentQuestion = question;
       });
+
+      if (question != null) {
+        _questionGeneration++;
+        _scheduleAutoQuestionSpeech(question, _questionGeneration);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -234,9 +251,38 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
   void _next() {
     if (_words.length < 2) return;
+
+    final question = _makeQuestion(_words);
+    _questionGeneration++;
+
     setState(() {
-      _currentQuestion = _makeQuestion(_words);
+      _currentQuestion = question;
       _selected = null;
+    });
+
+    _scheduleAutoQuestionSpeech(question, _questionGeneration);
+  }
+
+  void _scheduleAutoQuestionSpeech(
+    _Question question,
+    int generation,
+  ) {
+    final shouldSpeak = question.type == _QuestionType.translation ||
+        question.type == _QuestionType.sentenceTranslation;
+
+    if (!shouldSpeak) return;
+
+    final content = question.content?.trim();
+    if (content == null || content.isEmpty) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _selected != null) return;
+
+      _speech.speakGerman(
+        content,
+        activeKey: 'exercise-question',
+        automaticKey: 'exercise-question-$generation',
+      );
     });
   }
 
@@ -416,15 +462,30 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           const SizedBox(height: 20),
           Directionality(
             textDirection: rtlContent ? TextDirection.rtl : TextDirection.ltr,
-            child: Text(
-              q.content ?? '',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: q.content!.length > 45 ? 21 : 30,
-                height: 1.45,
-                fontWeight: FontWeight.w900,
-                color: const Color(0xFF171A2A),
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    q.content ?? '',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: q.content!.length > 45 ? 21 : 30,
+                      height: 1.45,
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF171A2A),
+                    ),
+                  ),
+                ),
+                if (_questionContentIsGerman(q)) ...[
+                  const SizedBox(width: 10),
+                  _speechButton(
+                    text: q.content ?? '',
+                    keyValue: 'exercise-question',
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -432,8 +493,57 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     );
   }
 
+  bool _questionContentIsGerman(_Question q) {
+    return q.type == _QuestionType.translation ||
+        q.type == _QuestionType.sentenceTranslation ||
+        q.type == _QuestionType.completeSentence ||
+        q.type == _QuestionType.findSentence;
+  }
+
+  Widget _speechButton({
+    required String text,
+    required String keyValue,
+    bool compact = false,
+  }) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: _speech.activeKey,
+      builder: (context, activeKey, _) {
+        final active = activeKey == keyValue;
+
+        return Material(
+          color: active
+              ? const Color(0xFFE9E8FF)
+              : const Color(0xFFF0F1F7),
+          borderRadius: BorderRadius.circular(compact ? 12 : 14),
+          child: InkWell(
+            onTap: () => _speech.speakGerman(
+              text,
+              activeKey: keyValue,
+            ),
+            borderRadius: BorderRadius.circular(compact ? 12 : 14),
+            child: Padding(
+              padding: EdgeInsets.all(compact ? 7 : 9),
+              child: Icon(
+                active
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_up_outlined,
+                color: const Color(0xFF5B5FEF),
+                size: compact ? 17 : 21,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _option(_Question q, int index, String value) {
     final selected = _selected == index;
+    final optionIsGerman =
+        q.type == _QuestionType.germanWord ||
+        q.type == _QuestionType.sentenceGerman ||
+        q.type == _QuestionType.completeSentence ||
+        q.type == _QuestionType.findSentence;
     final correct = _selected != null && index == q.correctIndex;
     final wrong = selected && !correct;
 
@@ -485,7 +595,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Directionality(
-                      textDirection: _isGerman(value)
+                      textDirection: optionIsGerman
                           ? TextDirection.ltr
                           : TextDirection.rtl,
                       child: Text(
@@ -498,6 +608,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                       ),
                     ),
                   ),
+                  if (optionIsGerman)
+                    _speechButton(
+                      text: value,
+                      keyValue: 'exercise-option-$index',
+                      compact: true,
+                    ),
                   if (correct)
                     const Icon(
                       Icons.check_circle_rounded,
@@ -550,10 +666,26 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            q.word.german,
-            textDirection: TextDirection.ltr,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  q.word.german,
+                  textDirection: TextDirection.ltr,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _speechButton(
+                text: q.word.german,
+                keyValue: 'exercise-feedback-word',
+                compact: true,
+              ),
+            ],
           ),
           const SizedBox(height: 3),
           Text(
@@ -564,10 +696,26 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             const SizedBox(height: 11),
             const Divider(height: 1),
             const SizedBox(height: 11),
-            Text(
-              q.word.example,
-              textDirection: TextDirection.ltr,
-              style: const TextStyle(fontWeight: FontWeight.w800, height: 1.4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    q.word.example,
+                    textDirection: TextDirection.ltr,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _speechButton(
+                  text: q.word.example,
+                  keyValue: 'exercise-feedback-sentence',
+                  compact: true,
+                ),
+              ],
             ),
             if (q.word.exampleTranslation.trim().isNotEmpty)
               Text(
