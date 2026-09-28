@@ -40,6 +40,13 @@ void main() {
       );
     });
 
+    test('rejects a one-letter different German word', () {
+      expect(
+        SpeechAnswerEvaluator.matches('Maus', 'Haus'),
+        isFalse,
+      );
+    });
+
     test('matches a slightly noisy sentence', () {
       expect(
         SpeechAnswerEvaluator.matches(
