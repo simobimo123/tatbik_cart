@@ -14,7 +14,6 @@ dependencies:
   share_plus: ^13.3.0
   file_picker: ^13.1.0
   flutter_tts: ^4.2.5
-  whisper_cpp_flutter_plus: ^0.4.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
