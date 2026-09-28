@@ -498,7 +498,7 @@ class _ReviewScreenState extends State<ReviewScreen>
         // نحتفظ بموعد داخلي حتى تمر كل البطاقات الموجودة
         // حاليًا قبل أن تعود هذه البطاقة.
         _queue.add(word);
-        final cardsBeforeEnd = (_queue.length - 1).clamp(0, 1 << 30);
+        final cardsBeforeEnd = _queue.length - 1;
         _sessionReturnAtStep[word.id] = _sessionStep + cardsBeforeEnd;
       } else {
         final delay = remembered
