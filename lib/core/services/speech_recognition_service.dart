@@ -145,9 +145,9 @@ class SpeechRecognitionService {
           noSpeechThreshold: 0.55,
         ),
         config: const WhisperStreamConfig(
-          updateInterval: Duration(seconds: 1),
-          windowDuration: Duration(seconds: 8),
-          confirmationLag: Duration(seconds: 2),
+          updateInterval: Duration(milliseconds: 700),
+          windowDuration: Duration(seconds: 6),
+          confirmationLag: Duration(seconds: 1),
         ),
       );
 
