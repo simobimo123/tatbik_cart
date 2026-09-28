@@ -8,6 +8,7 @@ class WordModel {
     required this.difficulty,
     required this.categoryId,
     required this.categoryName,
+    required this.categoryDifficulty,
     required this.builtin,
     required this.createdAt,
   });
@@ -20,6 +21,7 @@ class WordModel {
   final String difficulty;
   final int? categoryId;
   final String? categoryName;
+  final String categoryDifficulty;
   final bool builtin;
   final DateTime createdAt;
 
@@ -36,6 +38,10 @@ class WordModel {
           : 'unspecified',
       categoryId: map['category_id'] as int?,
       categoryName: (map['category_name'] as String?)?.trim(),
+      categoryDifficulty:
+          (map['category_difficulty'] as String?)?.trim().isNotEmpty == true
+              ? (map['category_difficulty'] as String).trim()
+              : 'unspecified',
       builtin: (map['builtin'] as int) == 1,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
