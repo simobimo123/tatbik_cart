@@ -151,7 +151,7 @@ class _ReviewScreenState extends State<ReviewScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${e}')),
+        SnackBar(content: Text('تعذر تشغيل الميكروفون: $e')),
       );
     }
   }
@@ -1390,9 +1390,18 @@ class _ReviewScreenState extends State<ReviewScreen>
                         width: double.infinity,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onTap: _revealCard,
-                          onPanUpdate: _handleDragUpdate,
-                          onPanEnd: _handleDragEnd,
+                          onTap: _voiceRecognition.isRecording ||
+                                  _voiceFinishing
+                              ? null
+                              : _revealCard,
+                          onPanUpdate: _voiceRecognition.isRecording ||
+                                  _voiceFinishing
+                              ? null
+                              : _handleDragUpdate,
+                          onPanEnd: _voiceRecognition.isRecording ||
+                                  _voiceFinishing
+                              ? null
+                              : _handleDragEnd,
                           child: Stack(
                             fit: StackFit.expand,
                             alignment: Alignment.center,
