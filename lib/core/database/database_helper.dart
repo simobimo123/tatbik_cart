@@ -16,7 +16,7 @@ class DatabaseHelper {
 
     _database = await openDatabase(
       path.join(directory, 'deutsch_lernen.db'),
-      version: 5,
+      version: 6,
       onCreate: (db, version) => _createTables(db),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -113,6 +113,14 @@ class DatabaseHelper {
             );
           }
         }
+        if (oldVersion < 6) {
+          await db.execute(
+            "ALTER TABLE categories ADD COLUMN difficulty TEXT NOT NULL DEFAULT 'unspecified'",
+          );
+          await db.execute(
+            'CREATE INDEX IF NOT EXISTS categories_difficulty ON categories(difficulty)',
+          );
+        }
       },
     );
 
@@ -160,6 +168,7 @@ class DatabaseHelper {
       'CREATE TABLE categories ('
       'id INTEGER PRIMARY KEY AUTOINCREMENT, '
       'name TEXT NOT NULL UNIQUE, '
+      'difficulty TEXT NOT NULL DEFAULT "unspecified", '
       'created_at TEXT NOT NULL'
       ')',
     );
@@ -207,6 +216,7 @@ class DatabaseHelper {
           } else {
             categoryId = await txn.insert('categories', {
               'name': name,
+              'difficulty': item.categoryDifficulty,
               'created_at': DateTime.now().toIso8601String(),
             });
           }
