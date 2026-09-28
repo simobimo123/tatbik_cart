@@ -10,6 +10,7 @@ class SpeechAnswerEvaluator {
     final target = normalize(expected);
 
     if (actual.isEmpty || target.isEmpty) return false;
+    if (RegExp(r'[\\u0600-\\u06FF]').hasMatch(actual)) return false;
     if (actual == target) return true;
 
     if (!sentence) return false;
@@ -23,15 +24,7 @@ class SpeechAnswerEvaluator {
     final targetWords = target.split(' ');
     final overlap = _wordOverlap(actualWords, targetWords);
 
-    if (sentence) {
-      return similarity >= 0.86 || overlap >= 0.82;
-    }
-
-    if (target.length <= 5) {
-      return similarity >= 0.84;
-    }
-
-    return similarity >= 0.88 || overlap >= 0.9;
+    return similarity >= 0.86 || overlap >= 0.82;
   }
 
   static String normalize(String value) {
@@ -53,7 +46,16 @@ class SpeechAnswerEvaluator {
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
-    const fillers = {'äh', 'ähm', 'eh', 'hm', 'hmm'};
+    const fillers = {
+      'äh',
+      'ähm',
+      'eh',
+      'ehm',
+      'hm',
+      'hmm',
+      'aeh',
+      'aehm',
+    };
     final words = text
         .split(' ')
         .where((word) => word.isNotEmpty && !fillers.contains(word))
