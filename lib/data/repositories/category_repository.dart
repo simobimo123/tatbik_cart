@@ -11,12 +11,11 @@ class CategoryRepository {
   Future<List<CategoryModel>> getCategories() async {
     final db = await _databaseHelper.database;
     final rows = await db.rawQuery(
-      'SELECT c.id, c.name, c.difficulty, c.created_at, COUNT(w.id) AS word_count '
+      'SELECT c.id, c.name, c.difficulty, c.created_at, '
+      'COUNT(w.id) AS word_count '
       'FROM categories c '
       'LEFT JOIN words w '
       'ON w.category_id=c.id AND w.builtin=1 '
-      'LEFT JOIN reviews r ON r.word_id=w.id '
-      'WHERE r.word_id IS NULL '
       'GROUP BY c.id '
       'ORDER BY c.name COLLATE NOCASE ASC, c.id ASC',
     );
@@ -79,32 +78,15 @@ class CategoryRepository {
     final db = await _databaseHelper.database;
 
     await db.transaction((txn) async {
-      final words = await txn.query(
+      // حذف المجموعة لا يعني حذف الكلمات. الكلمات جزء من قاعدة
+      // البيانات ويمكن أن تكون مرتبطة بالمراجعة أو الاكتشاف أو
+      // مجموعات أخرى في المستقبل. لذلك نفصلها عن المجموعة فقط.
+      await txn.update(
         'words',
-        columns: ['id'],
+        {'category_id': null},
         where: 'category_id=?',
         whereArgs: [id],
       );
-
-      for (final row in words) {
-        final wordId = row['id'] as int;
-
-        await txn.delete(
-          'reviews',
-          where: 'word_id=?',
-          whereArgs: [wordId],
-        );
-        await txn.delete(
-          'word_discoveries',
-          where: 'word_id=?',
-          whereArgs: [wordId],
-        );
-        await txn.delete(
-          'words',
-          where: 'id=?',
-          whereArgs: [wordId],
-        );
-      }
 
       await txn.delete(
         'categories',
