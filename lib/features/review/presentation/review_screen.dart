@@ -549,6 +549,8 @@ class _ReviewScreenState extends State<ReviewScreen>
     var bestDueIndex = -1;
     var bestDueStep = 1 << 60;
     var firstAvailableIndex = -1;
+    var earliestFutureIndex = -1;
+    var earliestFutureStep = 1 << 60;
 
     for (var i = 0; i < _queue.length; i++) {
       final word = _queue[i];
@@ -564,11 +566,24 @@ class _ReviewScreenState extends State<ReviewScreen>
       if (dueStep <= _sessionStep && dueStep < bestDueStep) {
         bestDueStep = dueStep;
         bestDueIndex = i;
+      } else if (dueStep > _sessionStep &&
+          dueStep < earliestFutureStep) {
+        earliestFutureStep = dueStep;
+        earliestFutureIndex = i;
       }
     }
 
-    final targetIndex =
-        bestDueIndex >= 0 ? bestDueIndex : firstAvailableIndex;
+    // إذا لم توجد بطاقة متاحة الآن، لكن توجد بطاقات مؤجلة، نختار
+    // أقرب بطاقة مؤجلة بدل إفراغ جلسة المراجعة.
+    //
+    // يحدث هذا خصوصًا عندما يكون عدد البطاقات المتبقية أقل من
+    // التأخير المطلوب (10 أو 30 بطاقة). لا توجد بطاقات أخرى يمكن
+    // عرضها لتمرير العد، لذلك نكمل بالدورة من أقرب بطاقة.
+    final targetIndex = bestDueIndex >= 0
+        ? bestDueIndex
+        : firstAvailableIndex >= 0
+            ? firstAvailableIndex
+            : earliestFutureIndex;
 
     if (targetIndex < 0 || targetIndex == 0) return;
 
@@ -578,6 +593,8 @@ class _ReviewScreenState extends State<ReviewScreen>
 
   int? _findEligibleIndex() {
     var firstAvailable = -1;
+    var earliestFutureIndex = -1;
+    var earliestFutureStep = 1 << 60;
 
     for (var i = 0; i < _queue.length; i++) {
       final dueStep = _sessionReturnAtStep[_queue[i].id];
@@ -592,9 +609,21 @@ class _ReviewScreenState extends State<ReviewScreen>
       if (dueStep <= _sessionStep) {
         return i;
       }
+
+      if (dueStep < earliestFutureStep) {
+        earliestFutureStep = dueStep;
+        earliestFutureIndex = i;
+      }
     }
 
-    return firstAvailable >= 0 ? firstAvailable : null;
+    // لا نعرض شاشة "انتهت البطاقات" ما دامت هناك بطاقات في
+    // الجلسة. إذا كانت كلها مؤجلة ولا توجد بطاقة أخرى لتمرير
+    // العد، نكمل بأقرب بطاقة مؤجلة.
+    return firstAvailable >= 0
+        ? firstAvailable
+        : earliestFutureIndex >= 0
+            ? earliestFutureIndex
+            : null;
   }
 
   Future<void> _delete() async {
