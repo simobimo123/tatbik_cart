@@ -650,7 +650,7 @@ class _ReviewScreenState extends State<ReviewScreen>
     // البطاقة نفسها يجب أن تُنطق تلقائيًا مرة واحدة فقط
     // خلال ظهورها الحالي، سواء كانت الألمانية في الأمام
     // أو ظهرت بعد الكشف.
-    final automaticKey = 'review-${word.id}-session-$_sessionStep';
+    final automaticKey = 'review-${word.id}-session-$_sessionAnswered';
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _isAnimating) return;
