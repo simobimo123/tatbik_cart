@@ -494,9 +494,12 @@ class _ReviewScreenState extends State<ReviewScreen>
 
       if (remembered && hasBeenAnsweredBefore) {
         // بعد أن يعرفها المستخدم للمرة الثانية:
-        // تُنقل لنهاية الحزمة ولا تعود لها أولوية داخل الجلسة.
-        _sessionReturnAtStep.remove(word.id);
+        // تُنقل إلى نهاية الحزمة الحالية، ولا تعود مباشرة.
+        // نحتفظ بموعد داخلي حتى تمر كل البطاقات الموجودة
+        // حاليًا قبل أن تعود هذه البطاقة.
         _queue.add(word);
+        final cardsBeforeEnd = (_queue.length - 1).clamp(0, 1 << 30);
+        _sessionReturnAtStep[word.id] = _sessionStep + cardsBeforeEnd;
       } else {
         final delay = remembered
             ? LearningConfig.reviewRememberedDelayCards
@@ -516,7 +519,15 @@ class _ReviewScreenState extends State<ReviewScreen>
       _prepareNextCard();
     });
 
-    await saveFuture;
+    try {
+      await saveFuture;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر حفظ نتيجة المراجعة: $e')),
+        );
+      }
+    }
 
     // عندما نقترب من نهاية الدفعة، نطلب بطاقات مستحقة أخرى من قاعدة
     // البيانات حتى لا يتوقف المستخدم عند حد الدفعة 300.
@@ -620,8 +631,22 @@ class _ReviewScreenState extends State<ReviewScreen>
 
     final word = _queue.first;
 
-    await _animateCardExit(const Offset(0, 500));
-    await _words.remove(word.id);
+    setState(() => _isAnimating = true);
+
+    try {
+      await _animateCardExit(const Offset(0, 500));
+      await _words.remove(word.id);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isAnimating = false;
+        _exitAnimation = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حذف البطاقة: $e')),
+      );
+      return;
+    }
 
     if (!mounted) return;
 
@@ -1430,6 +1455,14 @@ class _ReviewScreenState extends State<ReviewScreen>
     final eligibleIndex = _findEligibleIndex();
 
     if (eligibleIndex == null) {
+      // حماية إضافية: لا نبقى عالقين في حالة الانتظار إذا كانت
+      // جميع البطاقات مؤجلة. ننقل العداد إلى أقرب موعد مستحق
+      // في الإطار التالي بدل ترك الشاشة بلا بطاقة.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_isAnimating && _queue.isNotEmpty) {
+          setState(_prepareNextCard);
+        }
+      });
       return _buildWaitingState();
     }
 
