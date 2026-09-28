@@ -136,6 +136,74 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       types.add(_QuestionType.audioMatch);
     }
 
+    switch (types[_random.nextInt(types.length)]) {
+      case _QuestionType.translation:
+        return _buildQuestion(
+          _QuestionType.translation,
+          word,
+          'ما الترجمة الصحيحة للكلمة؟',
+          word.german,
+          word.translation,
+          words.map((w) => w.translation),
+        );
+      case _QuestionType.germanWord:
+        return _buildQuestion(
+          _QuestionType.germanWord,
+          word,
+          'أي كلمة ألمانية تطابق المعنى؟',
+          word.translation,
+          word.german,
+          words.map((w) => w.german),
+        );
+      case _QuestionType.sentenceTranslation:
+        return _buildQuestion(
+          _QuestionType.sentenceTranslation,
+          word,
+          'ما الترجمة الصحيحة لهذه الجملة؟',
+          word.example,
+          word.exampleTranslation,
+          words.map((w) => w.exampleTranslation),
+        );
+      case _QuestionType.sentenceGerman:
+        return _buildQuestion(
+          _QuestionType.sentenceGerman,
+          word,
+          'أي جملة ألمانية تطابق هذه الترجمة؟',
+          word.exampleTranslation,
+          word.example,
+          words.map((w) => w.example),
+        );
+      case _QuestionType.completeSentence:
+        final masked = _mask(word.example, word.german);
+        if (masked == word.example) {
+          return _buildQuestion(
+            _QuestionType.translation,
+            word,
+            'ما الترجمة الصحيحة للكلمة؟',
+            word.german,
+            word.translation,
+            words.map((w) => w.translation),
+          );
+        }
+        return _buildQuestion(
+          _QuestionType.completeSentence,
+          word,
+          'أكمل الجملة بالكلمة المناسبة',
+          masked,
+          word.german,
+          words.map((w) => w.german),
+        );
+      case _QuestionType.findSentence:
+        return _buildQuestion(
+          _QuestionType.findSentence,
+          word,
+          'اختر الجملة التي تحتوي على الكلمة المطلوبة',
+          word.german,
+          word.example,
+          words.map((w) => w.example),
+        );
+      case _QuestionType.audioMatch:
+        return _buildAudioMatchQuestion(words);
     }
   }
 
